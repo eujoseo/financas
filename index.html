@@ -312,6 +312,30 @@ dialog h3{font-size:18px}
 .eye.on .slash{display:none}
 .eye:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .priv-head{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.quote{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 16px;border-radius:var(--r);background:linear-gradient(90deg,var(--accent-wash),transparent);border:1px solid var(--line);font-size:14.5px;font-style:italic;color:var(--ink-2)}
+.seg2{display:inline-flex;gap:4px}
+.sec-h{font-size:15px;margin:6px 0 -6px;color:var(--ink-2)}
+.day-sticky{position:sticky;top:calc(env(safe-area-inset-top,0px) + 132px)}
+@media (max-width:860px){.day-sticky{position:static}}
+.linkbtn{appearance:none;border:0;background:none;padding:0;font:inherit;color:inherit;cursor:pointer;text-transform:inherit;letter-spacing:inherit;font-weight:inherit}
+.linkbtn:hover{color:var(--accent)}
+.yr{font-family:var(--f-num);font-variant-numeric:tabular-nums;font-size:11.5px}
+.yr th,.yr td{padding:4px 7px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--line)}
+.yr thead th{position:sticky;top:0;background:var(--surface-2);font-family:var(--f-body);font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);z-index:1}
+.yr td:first-child,.yr th:first-child{position:sticky;left:0;background:var(--surface);text-align:left;color:var(--muted);z-index:2}
+.yr thead th:first-child{background:var(--surface-2)}
+.yr td[data-goday]{cursor:pointer}
+.yr td[data-goday]:hover{outline:1px solid var(--accent);outline-offset:-1px}
+.yr td.fut{font-style:italic}
+.yr td.tdy{background:var(--today);font-weight:600;outline:1px solid var(--warn);outline-offset:-1px}
+.yr td.nx{background:var(--surface-2)}
+.yr th.cur{color:var(--ink)}
+.yr-wrap{max-height:70vh;overflow:auto}
+.tbl tr.cur-row td{background:var(--accent-wash)}
+.chk{display:flex;gap:8px;align-items:center;font-size:13.5px;cursor:pointer}
+.chk input{width:16px;height:16px;accent-color:var(--accent)}
+.casa-ic{font-size:24px;width:40px;height:40px;border-radius:12px;background:var(--surface-2);display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto}
+.casa-row .chk{align-self:center}
 .catnew{display:flex;gap:6px;align-items:center}.catnew input{flex:1;min-width:0}
 .alerts{display:grid;gap:8px}
 .alert{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;border-radius:var(--r);padding:10px 14px;border:1px solid}
@@ -332,9 +356,10 @@ dialog h3{font-size:18px}
     <button class="btn sm primary" id="fab" type="button">+ Lançar</button>
     <nav class="tabs" role="tablist" id="tabs">
       <button class="tab" role="tab" data-tab="geral">Visão geral</button>
-      <button class="tab" role="tab" data-tab="mes">Mês</button>
+      <button class="tab" role="tab" data-tab="mes">Planilha</button>
       <button class="tab" role="tab" data-tab="lanc">Lançamentos</button>
       <button class="tab" role="tab" data-tab="cartoes">Cartões</button>
+      <button class="tab" role="tab" data-tab="casa">Casa</button>
       <button class="tab" role="tab" data-tab="cats">Categorias</button>
       <button class="tab" role="tab" data-tab="fixos">Fixos</button>
       <button class="tab" role="tab" data-tab="eco">Economia</button>
@@ -391,7 +416,7 @@ const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch
 // Categorias-base, a partir das do modelo original (Moradia/Apartamento, Saúde, Viagem, Trabalho, Seguro, Telefone, Estudos, Alimentação, Serviços…).
 const BASE_CATS = {
   entrada: ["Salário", "Honorários", "Auxílio família", "Reembolso", "Rendimentos", "Presente", "Vendas", "Ajustes", "Outras entradas"],
-  saida: ["Moradia", "Contas da casa", "Cartão de crédito", "Alimentação", "Saúde", "Esporte", "Trabalho", "Estudos", "Seguro", "Telefone", "Transporte", "Assinaturas", "Serviços", "Viagem", "Lazer", "Vestuário", "Cuidados pessoais", "Presentes", "Doações", "Impostos e taxas", "Ajustes", "Outros"],
+  saida: ["Moradia", "Casa", "Contas da casa", "Cartão de crédito", "Alimentação", "Saúde", "Esporte", "Trabalho", "Estudos", "Seguro", "Telefone", "Transporte", "Assinaturas", "Serviços", "Viagem", "Lazer", "Vestuário", "Cuidados pessoais", "Presentes", "Doações", "Impostos e taxas", "Ajustes", "Outros"],
   diario: ["Lanches", "Mercado", "Alimentação", "Saúde", "Farmácia", "Barbearia", "Gasolina", "Transporte", "Lazer", "Outros"],
   invest: ["Reserva de emergência", "Investimentos", "Previdência", "Tesouro Direto", "Renda variável"]
 };
@@ -410,7 +435,7 @@ const DEFAULT_CONFIG = () => ({
 });
 const DEFAULT_PAT = () => ({ contas: [], valores: {} });
 const S = { config: null, meses: {}, patrimonio: null, ready: false };
-const UI = { tab: "geral", ym: curYm(), day: null, lancYm: curYm(), lancTipo: "", lancQ: "", ecoYear: +curYm().slice(0, 4), patYm: curYm(), patUnlock: false, card: null, cardYm: null, catYm: null };
+const UI = { tab: "geral", ym: curYm(), day: null, lancYm: curYm(), lancTipo: "", lancQ: "", ecoYear: +curYm().slice(0, 4), patYm: curYm(), patUnlock: false, mesView: "mes", anoY: +curYm().slice(0, 4), casaYm: null, card: null, cardYm: null, catYm: null };
 try { const t = lsGet("fj-ui-tab"); if (t) UI.tab = t; } catch {}
 
 /* ───────── storage: Claude db when available, browser otherwise ───────── */
@@ -672,7 +697,7 @@ function previstos(ym) {
   const out = [];
   for (const r of cfg().recorrentes || []) {
     if (!recActive(r, ym) || (cardOf(r.pag) && r.t !== "entrada") || covered.has(r.id)) continue;
-    out.push({ prev: true, rec: r.id, d: `${ym}-${pad(Math.min(+r.dia || 1, n))}`, t: r.t, v: r2(r.v), desc: r.desc, cat: r.cat, pag: r.pag });
+    out.push({ prev: true, rec: r.id, d: `${ym}-${pad(Math.min(+r.dia || 1, n))}`, t: r.t, v: r2(prevValue(r, ym)), desc: r.desc, cat: r.cat, pag: r.pag, media: !!r.media });
   }
   for (const c of cfg().cartoes || []) {
     const key = "fatura:" + c.nome;
@@ -747,6 +772,18 @@ function catSpend(ym) {
   return out;
 }
 const orcMes = () => sum((cfg().orcDiario || []).map(o => o.v));
+// Valor previsto de um fixo: o cadastrado, ou a média dos últimos 3 meses pagos (bom para luz, água, gás).
+function prevValue(r, ym) {
+  if (!r.media) return +r.v;
+  const vals = [];
+  for (const k of Object.keys(S.meses).filter(k => k < ym).sort().reverse()) {
+    const it = monthItems(k).find(i => i.rec === r.id && !i.skip);
+    if (it) vals.push(+it.v);
+    if (vals.length >= 3) break;
+  }
+  return vals.length ? r2(sum(vals) / vals.length) : +r.v;
+}
+const isCasa = r => !!r && r.grupo === "casa";
 const alertaDia = () => { const a = +cfg().alertaDiario; return a > 0 && a <= 1.5 ? a : 0.8; };
 // Avisos: diário de uma categoria perto/acima do orçamento no mês atual; fatura acima do valor de aviso do cartão.
 function avisos() {
@@ -882,6 +919,39 @@ $("#tabs").addEventListener("click", e => { const b = e.target.closest(".tab"); 
 $("#fab").addEventListener("click", () => openItem({ d: UI.tab === "mes" && UI.day ? UI.day : (UI.ym === curYm() || UI.tab !== "mes" ? defaultDate() : UI.ym + "-01"), t: "diario" }));
 $("#dataBtn").addEventListener("click", openData);
 $("#driveBtn").addEventListener("click", () => Drive.connect());
+const FRASES = [
+  "Cada real guardado hoje é um pedaço da sua liberdade amanhã, José.",
+  "Riqueza não é o quanto você ganha, é o quanto você mantém e faz crescer.",
+  "Pequenos aportes, feitos todo mês, constroem grandes patrimônios.",
+  "Quem anota, enxerga. Quem enxerga, decide melhor.",
+  "Seu futuro agradece cada escolha consciente de hoje.",
+  "A reserva de emergência é a paz que você compra antes de precisar dela.",
+  "Gastar menos do que se ganha é simples. Fazer isso todo mês é o que muda a vida.",
+  "Dinheiro organizado hoje é tempo livre no futuro.",
+  "Disciplina financeira é um presente para o José de daqui a 10 anos.",
+  "Os juros compostos trabalham a favor de quem começa cedo e não para.",
+  "Não é sobre se privar, é sobre escolher o que realmente importa.",
+  "Orçamento não é prisão: é o mapa que te leva aonde você quer chegar.",
+  "Cada fatura paga em dia é um passo a mais rumo à tranquilidade.",
+  "Morar sozinho é liberdade, e liberdade combina com planejamento.",
+  "Investir é plantar hoje a sombra em que você vai descansar amanhã.",
+  "Constância vence intensidade: um pouco todo mês vale mais que muito de vez em quando.",
+  "O melhor momento para começar a poupar foi ontem. O segundo melhor é hoje.",
+  "Saber para onde vai o dinheiro é o primeiro passo para mandar nele.",
+  "Metas claras transformam sonhos em datas.",
+  "Seu patrimônio é o placar das suas boas decisões ao longo do tempo.",
+  "Hoje é um ótimo dia para ficar um pouco mais perto dos seus objetivos, José.",
+  "Quem controla os gastos não depende da sorte.",
+  "Um mês de cada vez, um lançamento de cada vez: é assim que se constrói.",
+  "Liberdade financeira é poder dizer sim ao que importa e não ao que não importa.",
+  "O José do futuro está torcendo por você agora.",
+  "Planejar não tira a graça da vida: garante que ela continue boa por muito tempo.",
+  "Foco no longo prazo: as tempestades passam, os bons hábitos ficam.",
+  "Você já está fazendo o mais difícil, que é acompanhar de perto. Continue, José!",
+  "Cada conta paga em dia é uma preocupação a menos na cabeça.",
+  "Sua casa, suas regras, seu orçamento: você no comando, José."
+];
+let FRASE_I = Math.floor(Math.random() * FRASES.length);
 const EYE_SVG = `<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="2"/><line class="slash" x1="4" y1="4" x2="20" y2="20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`;
 function eyeBtn(target) { return `<button type="button" class="eye" data-eye="${target}" aria-label="Segure para ver os valores" title="Segure para ver">${EYE_SVG}</button>`; }
 // Segure (mouse, dedo ou tecla Espaço/Enter) para mostrar; soltou, esconde.
@@ -951,7 +1021,7 @@ function renderNow() {
   if (setup) { viewSetup(v); return; }
   compute();
   hideTip();
-  const fn = { geral: viewGeral, mes: viewMes, lanc: viewLanc, cartoes: viewCartoes, cats: viewCats, fixos: viewFixos, eco: viewEco, pat: viewPat }[UI.tab] || viewGeral;
+  const fn = { geral: viewGeral, mes: viewMes, lanc: viewLanc, cartoes: viewCartoes, casa: viewCasa, cats: viewCats, fixos: viewFixos, eco: viewEco, pat: viewPat }[UI.tab] || viewGeral;
   fn(v);
 }
 /* ───────── configuração inicial (passo a passo) ───────── */
@@ -1222,6 +1292,7 @@ function viewGeral(v) {
   for (const ym of [cy, ymAdd(cy, 1)]) if (M(ym)) for (const p of M(ym).prevs) if (p.d >= today() && upcoming.length < 6) upcoming.push(p);
   const avs = avisos();
   v.innerHTML = `
+    <div class="quote"><span>💬 ${esc(FRASES[FRASE_I])}</span><button class="btn sm ghost" type="button" id="qNext" aria-label="Outra frase" title="Outra frase">↻</button></div>
     ${avisosHtml(avs)}
     ${pend.length ? `<div class="banner"><span><span class="ic">!</span><b>${pend.length} lançamento${pend.length > 1 ? "s" : ""} fixo${pend.length > 1 ? "s" : ""} já ${pend.length > 1 ? "venceram" : "venceu"} e ainda não ${pend.length > 1 ? "foram confirmados" : "foi confirmado"}</b> <span class="muted small">(${[...new Set(pend.map(p => ymShort(p.d.slice(0, 7))))].join(", ")})</span>. Eles entram no saldo previsto, mas não no saldo real.</span><button class="btn sm" id="goPend" type="button">Revisar</button></div>` : ""}
     <section class="card hero">
@@ -1248,6 +1319,7 @@ function viewGeral(v) {
       <section class="card"><h2>Próximos fixos</h2><p class="sub">O que deve entrar e sair nas próximas semanas.</p><div class="items">${upcoming.length ? upcoming.map(p => itemRow(p)).join("") : `<div class="empty">Nenhum fixo previsto.</div>`}</div></section>
     </div>`;
   bindAvisos(v, avs); bindEyes(v);
+  $("#qNext").onclick = () => { FRASE_I = (FRASE_I + 1 + Math.floor(Math.random() * (FRASES.length - 1))) % FRASES.length; $("#view .quote span").textContent = "💬 " + FRASES[FRASE_I]; };
   v.querySelectorAll("[data-go]").forEach(b => b.onclick = () => { UI.tab = b.dataset.go; lsSet("fj-ui-tab", UI.tab); render(); scrollTo({ top: 0 }); });
   $("#goPend")?.addEventListener("click", () => { UI.tab = "mes"; UI.ym = pend[0].d.slice(0, 7); UI.day = null; render(); });
   bindItemRows(v);
@@ -1274,7 +1346,7 @@ function diaMeters(m) {
 }
 function itemRow(i, { acts = true, showDate = true } = {}) {
   const prev = !!i.prev;
-  const meta = [showDate ? dLabel(i.d) : "", i.cat, i.pag].filter(Boolean).map(esc).join(" · ");
+  const meta = [showDate ? dLabel(i.d) : "", i.cat, i.pag, prev && i.media ? "📈 média de 3 meses" : ""].filter(Boolean).map(esc).join(" · ");
   const sign = i.t === "entrada" ? "+" : "−";
   let a = "";
   if (prev && acts) a = `<div class="acts"><button class="btn sm primary" data-act="ok" type="button">Confirmar</button><button class="btn sm" data-act="adj" type="button">Ajustar valor</button><button class="btn sm ghost" data-act="skip" type="button">Pular este mês</button></div>`;
@@ -1301,6 +1373,7 @@ function bindItemRows(root) {
 
 /* the cédula — month view */
 function viewMes(v) {
+  if (UI.mesView === "ano") return viewAno(v);
   const ym = UI.ym; if (!M(ym)) { UI.ym = CALC.order.includes(curYm()) ? curYm() : CALC.order[0]; return viewMes(v); }
   const m = M(ym), td = today();
   const cell = (real, prev, card = 0) => {
@@ -1316,17 +1389,17 @@ function viewMes(v) {
   const prevsPend = m.prevs;
   const sel = UI.day && UI.day.startsWith(ym) ? m.days.find(d => d.ds === UI.day) : null;
   const f = cfg().faixas;
-  v.innerHTML = `
-    <div class="spread"><div class="mnav"><button class="btn" id="mPrev" type="button" aria-label="Mês anterior">‹</button><h2>${ymLabel(ym)}</h2><button class="btn" id="mNext" type="button" aria-label="Próximo mês">›</button></div>
-      <div class="row">${ym !== curYm() ? `<button class="btn sm" id="mToday" type="button">Ir para hoje</button>` : ""}<button class="btn sm primary" id="mAdd" type="button">+ Lançar em ${MESA[+ym.slice(5) - 1]}</button></div></div>
-    <div class="strip">
+  const stripHtml = `<div class="strip">
       <div><div class="label">Saldo inicial</div><div class="v">${num(m.saldoIni)}</div></div>
       <div><div class="label">Entradas</div><div class="v">${num(m.ent)}</div>${m.pEnt ? `<div class="p">+${num(m.pEnt)} previsto</div>` : ""}</div>
       <div><div class="label">Saídas</div><div class="v">${num(m.sai)}</div>${m.pSai ? `<div class="p">+${num(m.pSai)} previsto</div>` : ""}</div>
       <div><div class="label">Diário</div><div class="v">${num(m.dia)}</div>${m.pDia ? `<div class="p">+${num(m.pDia)} previsto</div>` : ""}</div>
       <div><div class="label">Saída total</div><div class="v">${num(T(m.sai, m.dia))}</div>${m.pSai + m.pDia ? `<div class="p">${num(T(T(m.sai, m.dia), T(m.pSai, m.pDia)))} com previsão</div>` : ""}</div>
       <div><div class="label">Saldo final</div><div class="v ${faixa(m.saldoFim)}">${num(m.saldoFim)}</div><div class="p">real: ${num(m.realFim)}</div></div>
-    </div>
+    </div>`;
+  v.innerHTML = `
+    <div class="spread"><div class="mnav"><button class="btn" id="mPrev" type="button" aria-label="Mês anterior">‹</button><h2>${ymLabel(ym)}</h2><button class="btn" id="mNext" type="button" aria-label="Próximo mês">›</button></div>
+      <div class="row">${mesToggle()}${ym !== curYm() ? `<button class="btn sm" id="mToday" type="button">Ir para hoje</button>` : ""}<button class="btn sm primary" id="mAdd" type="button">+ Lançar em ${MESA[+ym.slice(5) - 1]}</button></div></div>
     <div class="grid-main">
       <div>
         <div class="ledger-wrap"><table class="ledger"><thead><tr><th>Dia</th><th>Entrada</th><th>Saída</th><th>Diário</th><th>Saldo</th></tr></thead>
@@ -1334,13 +1407,18 @@ function viewMes(v) {
           <tfoot><tr><td>Total</td><td>${num(T(m.ent, m.pEnt))}</td><td>${num(T(m.sai, m.pSai))}</td><td>${num(T(m.dia, m.pDia))}</td><td class="${faixa(m.saldoFim)}">${num(m.saldoFim)}</td></tr></tfoot></table></div>
         <div class="legend"><span><i style="background:var(--good)"></i>acima de ${num(f.bom)}</span><span><i style="background:var(--ink)"></i>${num(f.ok)} a ${num(f.bom)}</span><span><i style="background:var(--warn)"></i>0 a ${num(f.ok)}</span><span><i style="background:var(--bad)"></i>negativo</span><span class="pv" style="font-style:italic">itálico = previsto</span><span>💳 = no cartão (vai para a fatura)</span></div>
       </div>
-      <div class="view" style="gap:18px">
+      <div class="day-sticky">
         <section class="card" id="dayCard">${sel ? dayPanel(sel) : `<h2>Toque num dia</h2><p class="sub" style="margin:0">Para ver e editar os lançamentos daquele dia, como os comentários das células na planilha.</p>`}</section>
+      </div>
+    </div>
+    <h3 class="sec-h">Resumo de ${MES[+ym.slice(5) - 1]}</h3>
+    ${stripHtml}
+    <div class="grid2">
         <section class="card"><h2>Fixos do mês</h2><p class="sub">${prevsPend.length ? "Confirme quando acontecer. Até lá, entram só no saldo previsto." : "Todos os fixos deste mês já foram confirmados."}</p>
           <div class="items">${prevsPend.map(p => itemRow(p)).join("")}${m.skipped.map(s => `<div class="item"><div><div class="d muted"><span class="tag">pulado</span>${esc(s.desc)}</div></div><div><button class="btn sm ghost" data-unskip="${esc(s.id)}" type="button">Desfazer</button></div></div>`).join("")}</div></section>
         <section class="card"><h2>Diário por categoria</h2><p class="sub">Orçamento mensal definido em Fixos.</p><div class="meters">${diaMeters(m)}</div></section>
-      </div>
     </div>`;
+  bindMesToggle(v);
   $("#mPrev").onclick = () => { const i = CALC.order.indexOf(ym); if (i > 0) { UI.ym = CALC.order[i - 1]; UI.day = null; render(); } else toast("Este é o primeiro mês. Ajuste o saldo inicial em Fixos para começar antes."); };
   $("#mNext").onclick = () => { const i = CALC.order.indexOf(ym); if (i < CALC.order.length - 1) { UI.ym = CALC.order[i + 1]; UI.day = null; render(); } };
   $("#mToday")?.addEventListener("click", () => { UI.ym = curYm(); UI.day = today(); render(); });
@@ -1349,6 +1427,54 @@ function viewMes(v) {
   v.querySelectorAll("[data-unskip]").forEach(b => b.onclick = () => { const it = findItem(b.dataset.unskip); if (it) delItem(it); });
   $("#dayAdd")?.addEventListener("click", () => openItem({ d: UI.day, t: "diario" }));
   bindItemRows(v);
+}
+function mesToggle() { return `<div class="seg2" role="group" aria-label="Visualização"><button class="chip" type="button" data-mv="mes" aria-pressed="${UI.mesView !== "ano"}">Mês</button><button class="chip" type="button" data-mv="ano" aria-pressed="${UI.mesView === "ano"}">Ano todo</button></div>`; }
+function bindMesToggle(v) { v.querySelectorAll("[data-mv]").forEach(b => b.onclick = () => { UI.mesView = b.dataset.mv; if (UI.mesView === "ano") UI.anoY = +UI.ym.slice(0, 4); render(); }); }
+const num0 = x => Math.round(+x || 0).toLocaleString("pt-BR");
+function viewAno(v) {
+  const years = [...new Set(CALC.order.map(x => +x.slice(0, 4)))];
+  if (!years.includes(UI.anoY)) UI.anoY = years.includes(+curYm().slice(0, 4)) ? +curYm().slice(0, 4) : years[0];
+  const y = UI.anoY, yi = years.indexOf(y), td = today(), cy = curYm();
+  const ms = Array.from({ length: 12 }, (_, i) => `${y}-${pad(i + 1)}`).filter(ym => ym >= CALC.start);
+  const antes = CALC.start > `${y}-01` && CALC.start.startsWith(String(y)) ? `<p class="small muted" style="margin:0 0 8px">O controle começa em ${ymLabel(CALC.start)}; os meses anteriores não aparecem.</p>` : "";
+  const T = (a, b) => r2(a + b);
+  const lin = ms.map(ym => {
+    const m = M(ym);
+    if (!m) return `<tr class="nodata"><td>${MES[+ym.slice(5) - 1]}</td><td class="n" colspan="6"><span class="muted">${ym < CALC.start ? "antes do início do controle" : "–"}</span></td></tr>`;
+    const prev = m.pEnt + m.pSai + m.pDia > 0;
+    return `<tr class="click ${ym === cy ? "cur-row" : ""}" data-goym="${ym}" tabindex="0"><td>${MES[+ym.slice(5) - 1]}${prev ? ' <span class="tag prev">previsto</span>' : ""}${ym === cy ? ' <span class="tag">atual</span>' : ""}</td>
+      <td class="n">${num(m.saldoIni)}</td><td class="n up">${num(T(m.ent, m.pEnt))}</td><td class="n">${num(T(m.sai, m.pSai))}</td><td class="n">${num(T(m.dia, m.pDia))}</td>
+      <td class="n"><b class="${faixa(m.saldoFim)}">${num(m.saldoFim)}</b></td><td class="n muted">${ym <= cy ? num(m.realFim) : "–"}</td></tr>`;
+  }).join("");
+  const mm = ms.map(M).filter(Boolean);
+  const tot = k => sum(mm.map(m => m[k]));
+  const head = `<tr><th>Dia</th>${ms.map(ym => `<th class="${ym === cy ? "cur" : ""}"><button class="linkbtn" type="button" data-goym="${ym}">${MESA[+ym.slice(5) - 1]}</button></th>`).join("")}</tr>`;
+  let body = "";
+  for (let d = 1; d <= 31; d++) {
+    body += `<tr><td>${pad(d)}</td>` + ms.map(ym => {
+      if (d > dim(ym)) return `<td class="nx"></td>`;
+      const m = M(ym), r = m ? m.days[d - 1] : null;
+      if (!r || r.before || r.saldo == null) return `<td class="z">–</td>`;
+      const cls = `${faixa(r.saldo)}${r.ds > td ? " fut" : ""}${r.ds === td ? " tdy" : ""}`;
+      return `<td class="${cls}" data-goday="${r.ds}" title="${dLabel(r.ds)}: ${brl(r.saldo)}${r.ds > td ? " (previsto)" : ""}">${num0(r.saldo)}</td>`;
+    }).join("") + "</tr>";
+  }
+  const f = cfg().faixas;
+  v.innerHTML = `
+    <div class="spread"><div class="mnav"><button class="btn" id="yPrev" type="button" aria-label="Ano anterior" ${yi <= 0 ? "disabled" : ""}>‹</button><h2>${y}</h2><button class="btn" id="yNext" type="button" aria-label="Próximo ano" ${yi >= years.length - 1 ? "disabled" : ""}>›</button></div>
+      <div class="row">${mesToggle()}</div></div>
+    <section class="card"><h2>Meses de ${y}</h2><p class="sub">Entradas, saídas e diário somam o confirmado e o previsto. Toque num mês para abrir a grade dele.</p>${antes}
+      <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Mês</th><th class="n">Saldo inicial</th><th class="n">Entradas</th><th class="n">Saídas</th><th class="n">Diário</th><th class="n">Saldo final</th><th class="n">Real</th></tr></thead>
+      <tbody>${lin}<tr class="tot"><td>Total do ano</td><td></td><td class="n">${num(T(tot("ent"), tot("pEnt")))}</td><td class="n">${num(T(tot("sai"), tot("pSai")))}</td><td class="n">${num(T(tot("dia"), tot("pDia")))}</td><td class="n">${mm.length ? num(mm[mm.length - 1].saldoFim) : "–"}</td><td></td></tr></tbody></table></div></section>
+    <section class="card"><h2>Saldo dia a dia — ${y}</h2><p class="sub">Como a planilha do Breno: cada coluna é um mês, cada linha um dia. Itálico é previsão; o dia de hoje fica destacado. Toque num dia para abrir.</p>
+      <div class="tbl-wrap yr-wrap"><table class="yr"><thead>${head}</thead><tbody>${body}</tbody></table></div>
+      <div class="legend"><span><i style="background:var(--good)"></i>acima de ${num(f.bom)}</span><span><i style="background:var(--ink)"></i>${num(f.ok)} a ${num(f.bom)}</span><span><i style="background:var(--warn)"></i>0 a ${num(f.ok)}</span><span><i style="background:var(--bad)"></i>negativo</span><span class="pv" style="font-style:italic">itálico = previsto</span></div></section>`;
+  bindMesToggle(v);
+  $("#yPrev").onclick = () => { if (yi > 0) { UI.anoY = years[yi - 1]; render(); } };
+  $("#yNext").onclick = () => { if (yi < years.length - 1) { UI.anoY = years[yi + 1]; render(); } };
+  const goMonth = (ym, day) => { UI.mesView = "mes"; UI.ym = ym; UI.day = day || null; render(); scrollTo({ top: 0 }); };
+  v.querySelectorAll("[data-goym]").forEach(el => { el.onclick = () => goMonth(el.dataset.goym); el.onkeydown = e => { if (e.key === "Enter") goMonth(el.dataset.goym); }; });
+  v.querySelectorAll("[data-goday]").forEach(el => el.onclick = () => goMonth(el.dataset.goday.slice(0, 7), el.dataset.goday));
 }
 function dayPanel(r) {
   const list = [...r.items.map(i => itemRow(i, { showDate: false })), ...(r.cardItems || []).map(i => itemRow(i, { showDate: false })), ...r.prevs.map(p => itemRow(p, { showDate: false }))];
@@ -1393,15 +1519,16 @@ function viewFixos(v) {
   const ativos = rec.filter(r => !r.fim || r.fim >= ym);
   const ent = ativos.filter(r => r.t === "entrada"), inv = ativos.filter(r => r.t === "invest");
   const cards = (c.cartoes || []).map(k => ({ ...k, itens: ativos.filter(r => r.t !== "entrada" && r.pag === k.nome) }));
-  const outras = ativos.filter(r => r.t === "saida" && !isCard(r.pag));
+  const outras = ativos.filter(r => r.t === "saida" && !isCard(r.pag) && !isCasa(r));
+  const casaF = ativos.filter(r => r.t === "saida" && !isCard(r.pag) && isCasa(r)), tCasa = sum(casaF.map(r => r.v));
   const enc = rec.filter(r => r.fim && r.fim < ym);
   const tEnt = sum(ent.map(r => r.v)), tCard = sum(cards.flatMap(k => k.itens).map(r => r.v)), tOut = sum(outras.map(r => r.v)), tInv = sum(inv.map(r => r.v)), tDia = orcMes();
-  const tSai = r2(tCard + tOut + tInv + tDia), sobra = r2(tEnt - tSai);
+  const tSai = r2(tCard + tOut + tCasa + tInv + tDia), sobra = r2(tEnt - tSai);
   const recRow = r => `<tr class="click" data-rec="${esc(r.id)}" tabindex="0"><td>${esc(r.desc)}${r.fim ? ` <span class="tag">até ${ymShort(r.fim)}</span>` : ""}${r.inicio && r.inicio > ym ? ` <span class="tag">a partir de ${ymShort(r.inicio)}</span>` : ""}</td><td class="muted">${isCard(r.pag) ? "" : "dia " + (r.dia || 1)}</td><td>${esc(r.cat || "")}</td><td class="muted">${esc(r.pag || "")}</td><td class="n">${num(r.v)}</td></tr>`;
   const grp = (title, list, total, extra = "") => `<tr class="grp"><td colspan="4">${title}${extra}</td><td class="n">${num(total)}</td></tr>${list.map(recRow).join("") || `<tr><td colspan="5" class="muted">Nada aqui ainda.</td></tr>`}`;
   v.innerHTML = `
     <section class="card">
-      <div class="spread"><div><h2>Plano de contas</h2><p class="sub" style="margin:0">O que entra e sai todo mês. Cada linha vira um lançamento previsto no mês, que você confirma na aba Mês.</p></div><button class="btn sm primary" id="fAdd" type="button">+ Novo fixo</button></div>
+      <div class="spread"><div><h2>Plano de contas</h2><p class="sub" style="margin:0">O que entra e sai todo mês. Cada linha vira um lançamento previsto no mês, que você confirma na aba Planilha.</p></div><button class="btn sm primary" id="fAdd" type="button">+ Novo fixo</button></div>
       <div class="strip" style="grid-template-columns:repeat(3,minmax(0,1fr));margin-top:14px">
         <div><div class="label">Entradas fixas</div><div class="v">${num(tEnt)}</div></div>
         <div><div class="label">Saídas fixas + diário + investimento</div><div class="v">${num(tSai)}</div></div>
@@ -1410,6 +1537,7 @@ function viewFixos(v) {
       <div class="tbl-wrap" style="margin-top:14px"><table class="tbl"><thead><tr><th>Descrição</th><th>Quando</th><th>Categoria</th><th>Pagamento</th><th class="n">Valor</th></tr></thead><tbody>
         ${grp("Entradas", ent, tEnt)}
         ${cards.map(k => grp(`${esc(k.nome)} <span class="muted small" style="font-weight:400">· fatura vence dia ${k.venc}</span>`, k.itens, sum(k.itens.map(r => r.v)))).join("")}
+        ${grp("🏠 Casa", casaF, tCasa)}
         ${grp("Outras saídas fixas (Pix, boleto)", outras, tOut)}
         ${grp("Investimentos", inv, tInv)}
         ${enc.length ? `<tr class="grp"><td colspan="5">Encerrados</td></tr>${enc.map(r => recRow(r).replace("<tr class=\"click\"", "<tr class=\"click pv\"")).join("")}` : ""}
@@ -1609,6 +1737,96 @@ function viewCats(v) {
   columnsChart($("#cCatMes"), { labels: hist.map(x => MESA[+x.slice(5) - 1]), series: [{ name: "Gasto", color: "var(--accent)", values: hist.map(x => sum(Object.values(hs[x]).map(o => o.total))) }], tipTitle: (l, i) => ymLabel(hist[i]) });
 }
 
+/* ───────── aba Casa ───────── */
+const CASA_TIPOS = [["Aluguel", "🏠"], ["Condomínio", "🏢"], ["Luz", "💡"], ["Água", "💧"], ["Internet", "🌐"], ["Gás", "🔥"], ["Seguro residencial", "🛡️"], ["IPTU", "📄"], ["Diarista", "🧹"], ["Celular", "📱"]];
+const casaIcon = d => { const s = String(d || "").toLowerCase(); const f = CASA_TIPOS.find(([n]) => s.includes(n.toLowerCase().split(" ")[0])); return f ? f[1] : "🏠"; };
+const CASA_SUG = [["Condomínio", 10, true], ["Luz", 10, true], ["Água", 10, true], ["Internet", 10, true], ["Seguro residencial", 10, true], ["Aluguel", 5, false], ["Gás", 10, false], ["IPTU", 10, false], ["Diarista", 5, false]];
+function casaSetup(v) {
+  const pags = ["Boleto", "Pix", "Débito automático", "Transferência", ...(cfg().cartoes || []).map(k => k.nome)];
+  v.innerHTML = `<section class="card" style="max-width:820px">
+    <h2 style="font-size:20px">Vamos montar sua casa 🏠</h2>
+    <p class="sub">Marque as contas que você vai ter e coloque um valor estimado. Cada uma vira um fixo previsto no mês; quando a conta chegar, você lança o valor real. A previsão dos meses seguintes passa a usar a média dos últimos 3 meses, então ela se ajusta sozinha.</p>
+    <div class="wz-rows">${CASA_SUG.map(([n, dia, on], i) => `<div class="wz-row casa-row">
+      <label class="chk" style="flex:1 1 180px"><input type="checkbox" id="cs-on-${i}" ${on ? "checked" : ""}> <span style="font-size:18px">${casaIcon(n)}</span> <b>${esc(n)}</b></label>
+      <label class="fld wz-f"><span>Valor estimado (R$)</span><input type="text" inputmode="decimal" id="cs-v-${i}" placeholder="0,00"></label>
+      <label class="fld wz-f" style="flex:0 1 90px"><span>Vence dia</span><input type="number" min="1" max="31" id="cs-d-${i}" value="${dia}"></label>
+      <label class="fld wz-f"><span>Pagamento</span><select id="cs-p-${i}">${pags.map(p => `<option>${esc(p)}</option>`).join("")}</select></label></div>`).join("")}</div>
+    <div class="cfg-grid" style="margin-top:12px"><label class="fld"><span>Começa em</span><input type="month" id="cs-ini" value="${curYm()}"></label></div>
+    <p class="err small down" id="cs-err" hidden></p>
+    <div class="row" style="margin-top:12px"><button class="btn primary" type="button" id="cs-save">Adicionar à minha casa</button><button class="btn" type="button" id="cs-one">+ Outra conta</button></div>
+    <div class="wz-tip" style="margin-top:14px"><b>Primeira casa?</b> Além das contas, separe um valor para os custos de entrada (caução, mudança, móveis e utensílios) e mantenha a reserva de emergência em dia: imprevistos de casa costumam aparecer no começo.</div>
+  </section>`;
+  $("#cs-one").onclick = () => openRec({ t: "saida", cat: "Casa", grupo: "casa", media: true, dia: 10, inicio: curYm(), pag: "Boleto" });
+  $("#cs-save").onclick = () => {
+    const c = cfg(), ini = $("#cs-ini").value || curYm(), novos = [];
+    for (let i = 0; i < CASA_SUG.length; i++) {
+      if (!$("#cs-on-" + i).checked) continue;
+      const vv = parseMoney($("#cs-v-" + i).value);
+      if (isNaN(vv) || vv <= 0) { const e = $("#cs-err"); e.textContent = `Coloque um valor estimado para ${CASA_SUG[i][0]} (ou desmarque).`; e.hidden = false; $("#cs-v-" + i).focus(); return; }
+      novos.push({ id: uid(), desc: CASA_SUG[i][0], t: "saida", v: vv, dia: Math.max(1, Math.min(31, +$("#cs-d-" + i).value || 10)), cat: "Casa", pag: $("#cs-p-" + i).value, inicio: ini, fim: null, grupo: "casa", media: true });
+    }
+    if (!novos.length) { const e = $("#cs-err"); e.textContent = "Marque pelo menos uma conta."; e.hidden = false; return; }
+    c.recorrentes.push(...novos); Store.saveConfig(); render(); toast(`🏠 ${novos.length} conta${novos.length > 1 ? "s" : ""} da casa adicionada${novos.length > 1 ? "s" : ""}`);
+  };
+}
+function viewCasa(v) {
+  const contas = (cfg().recorrentes || []).filter(isCasa);
+  if (!contas.length) return casaSetup(v);
+  if (!UI.casaYm || !M(UI.casaYm)) UI.casaYm = M(curYm()) ? curYm() : CALC.order[0];
+  const ym = UI.casaYm, pym = ymAdd(ym, -1), cy = curYm(), td = today();
+  const ativas = contas.filter(r => (r.inicio || "") <= ym && (!r.fim || ym <= r.fim));
+  const L = ativas.map(r => {
+    const its = monthItems(ym), pago = its.find(i => i.rec === r.id && !i.skip), pulado = its.find(i => i.rec === r.id && i.skip);
+    const noCartao = !!cardOf(r.pag), prev = M(ym)?.prevs.find(p => p.rec === r.id);
+    const ant = monthItems(pym).find(i => i.rec === r.id && !i.skip);
+    const venc = `${ym}-${pad(Math.min(+r.dia || 1, dim(ym)))}`;
+    const valor = pago ? +pago.v : pulado ? 0 : noCartao ? +r.v : prev ? prev.v : prevValue(r, ym);
+    const st = pago ? ["good", `✓ pago em ${dLabel(pago.d)}`] : pulado ? ["warn", "pulado"] : noCartao ? ["", "💳 vai na fatura"] : venc < td ? ["bad", "vencida"] : ["warn", `vence ${dLabel(venc)}`];
+    return { r, pago, pulado, noCartao, prev, ant, valor, st, venc };
+  }).sort((a, b) => (+a.r.dia || 1) - (+b.r.dia || 1));
+  const total = sum(L.map(x => x.valor)), pagoT = sum(L.filter(x => x.pago).map(x => x.valor)), aPagar = sum(L.filter(x => !x.pago && !x.pulado && !x.noCartao).map(x => x.valor));
+  const hist = Array.from({ length: 6 }, (_, k) => ymAdd(ym, k - 5)).filter(x => M(x));
+  const valIn = (r, m) => { const it = monthItems(m).find(i => i.rec === r.id && !i.skip); if (it) return { v: +it.v, real: true }; if (m >= cy && (r.inicio || "") <= m && (!r.fim || m <= r.fim)) return { v: cardOf(r.pag) ? +r.v : prevValue(r, m), real: false }; return null; };
+  const totM = hist.map(m => { const vals = contas.map(r => valIn(r, m)).filter(Boolean); return { m, v: sum(vals.map(x => x.v)), prev: vals.some(x => !x.real) }; });
+  const passados = totM.filter(x => x.m < ym && x.v > 0), media = passados.length ? sum(passados.map(x => x.v)) / passados.length : null;
+  const entFix = sum((cfg().recorrentes || []).filter(r => r.t === "entrada" && recActive(r, ym)).map(r => prevValue(r, ym)));
+  v.innerHTML = `
+    <div class="spread"><div class="mnav"><button class="btn" id="hPrev" type="button" aria-label="Mês anterior">‹</button><h2>${ymLabel(ym)}</h2><button class="btn" id="hNext" type="button" aria-label="Próximo mês">›</button></div>
+      <div class="row">${ym !== cy && M(cy) ? `<button class="btn sm" id="hToday" type="button">Mês atual</button>` : ""}<button class="btn sm primary" id="hAdd" type="button">+ Conta da casa</button></div></div>
+    <div class="strip" style="grid-template-columns:repeat(5,minmax(0,1fr))">
+      <div><div class="label">Casa no mês</div><div class="v">${num(total)}</div><div class="p">pago + a pagar</div></div>
+      <div><div class="label">Já pago</div><div class="v s-bom">${num(pagoT)}</div></div>
+      <div><div class="label">A pagar</div><div class="v ${aPagar ? "s-alerta" : ""}">${num(aPagar)}</div></div>
+      <div><div class="label">Média dos meses anteriores</div><div class="v">${media != null ? num(media) : "–"}</div></div>
+      <div><div class="label">Da sua renda fixa</div><div class="v">${entFix ? pct(total / entFix) : "–"}</div></div>
+    </div>
+    <div class="grid-main">
+      <section class="card"><h2>Contas da casa</h2><p class="sub">Quando a conta chegar, toque em “Lançar valor” e coloque o valor real. O que tem 📈 usa a média dos últimos 3 meses como previsão.</p>
+        <div class="items">${L.map(x => `<div class="item casa-item">
+          <div style="display:flex;gap:12px;align-items:center;min-width:0"><span class="casa-ic" aria-hidden="true">${casaIcon(x.r.desc)}</span><div style="min-width:0"><div class="d">${esc(x.r.desc)} <span class="pill ${x.st[0]}">${x.st[1]}</span></div>
+            <div class="m">dia ${x.r.dia || 1} · ${esc(x.r.pag || "")}${x.r.media ? " · 📈 média de 3 meses" : ""}${x.ant && x.valor ? ` · ${x.valor > x.ant.v ? "▲" : x.valor < x.ant.v ? "▼" : "="} ${num(Math.abs(x.valor - x.ant.v))} vs ${MESA[+pym.slice(5) - 1]}` : ""}</div></div></div>
+          <div class="v ${x.pago ? "" : "pv"}" style="${x.pago ? "" : "font-style:italic;color:var(--prev)"}">${num(x.valor)}</div>
+          <div class="acts">${x.prev && !x.pago ? `<button class="btn sm primary" type="button" data-pay="${esc(x.r.id)}">Lançar valor</button>` : ""}${x.pago ? `<button class="btn sm" type="button" data-edit-it="${esc(x.pago.id)}">Corrigir valor</button>` : ""}<button class="btn sm ghost" type="button" data-edit-rec="${esc(x.r.id)}">Editar conta</button></div>
+        </div>`).join("") || `<div class="empty">Nenhuma conta da casa ativa neste mês.</div>`}
+        ${L.length ? `<div class="grp-h" style="color:var(--ink);border-bottom:0"><span>Total</span><span>${num(total)}</span></div>` : ""}</section>
+      <div class="view" style="gap:18px">
+        <section class="card"><h2>Total da casa por mês</h2><p class="sub">Barras claras são previsão.</p><div class="chart" id="cCasa"></div></section>
+        <section class="card"><h2>Histórico por conta</h2><p class="sub">Valores pagos; em itálico, a previsão.</p>
+          <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Conta</th>${hist.map(m => `<th class="n ${m === ym ? "cur" : ""}">${MESA[+m.slice(5) - 1]}</th>`).join("")}</tr></thead><tbody>
+          ${contas.map(r => `<tr><td>${casaIcon(r.desc)} ${esc(r.desc)}</td>${hist.map(m => { const x = valIn(r, m); return `<td class="n ${m === ym ? "cur" : ""}" ${x && !x.real ? 'style="font-style:italic;color:var(--prev)"' : ""}>${x ? num(x.v) : '<span class="muted">–</span>'}</td>`; }).join("")}</tr>`).join("")}
+          <tr class="tot"><td>Total</td>${totM.map(t => `<td class="n ${t.m === ym ? "cur" : ""}">${num(t.v)}</td>`).join("")}</tr></tbody></table></div></section>
+      </div>
+    </div>`;
+  $("#hPrev").onclick = () => { const i = CALC.order.indexOf(ym); if (i > 0) { UI.casaYm = CALC.order[i - 1]; render(); } };
+  $("#hNext").onclick = () => { const i = CALC.order.indexOf(ym); if (i < CALC.order.length - 1) { UI.casaYm = CALC.order[i + 1]; render(); } };
+  $("#hToday")?.addEventListener("click", () => { UI.casaYm = cy; render(); });
+  $("#hAdd").onclick = () => openRec({ t: "saida", cat: "Casa", grupo: "casa", media: true, dia: 10, inicio: ym, pag: "Boleto" });
+  v.querySelectorAll("[data-pay]").forEach(b => b.onclick = () => { const p = M(ym)?.prevs.find(q => q.rec === b.dataset.pay); if (p) openItem({ d: p.d < td && ym === cy ? td : p.d, t: p.t, v: p.v, desc: p.desc, cat: p.cat, rec: p.rec, pag: p.pag }, { confirming: true }); });
+  v.querySelectorAll("[data-edit-it]").forEach(b => b.onclick = () => { const it = findItem(b.dataset.editIt); if (it) openItem(it); });
+  v.querySelectorAll("[data-edit-rec]").forEach(b => b.onclick = () => { const r = (cfg().recorrentes || []).find(x => x.id === b.dataset.editRec); if (r) openRec(clone(r)); });
+  columnsChart($("#cCasa"), { labels: totM.map(t => MESA[+t.m.slice(5) - 1]), series: [{ name: "Casa", color: "var(--accent)", values: totM.map(t => t.v) }], faded: totM.map(t => t.prev), tipTitle: (l, i) => ymLabel(totM[i].m) });
+}
+
 /* economia */
 function ecoYear(y) {
   const rows = [];
@@ -1662,18 +1880,15 @@ function viewPat(v) {
   }
   body += line("<b>Patrimônio líquido</b>", ym => `<b>${num(T[ym].pl)}</b>`, "tot");
   body += line("% de patrimônio líquido", ym => pct(T[ym].pct));
-  v.innerHTML = `<div class="priv view ${UI.patUnlock ? "revealed" : ""}" id="privPat" ${UI.patUnlock ? 'data-lock="1"' : ""} style="gap:18px"><section class="card">
+  v.innerHTML = `<section class="card">
     <div class="spread"><div><h2>Patrimônio</h2><p class="sub" style="margin:0">Atualize uma vez por mês. Conta sem valor no mês repete o anterior (em cinza), igual à fórmula da planilha.</p></div>
-      <div class="row">${eyeBtn("privPat")}<button class="btn sm" id="pLock" type="button">${UI.patUnlock ? "🙈 Esconder" : "🔓 Mostrar para editar"}</button><div class="mnav"><button class="btn" id="pPrev" type="button" aria-label="Mês anterior">‹</button><h2 style="font-size:18px">${ymLabel(cur)}</h2><button class="btn" id="pNext" type="button" aria-label="Próximo mês">›</button></div><button class="btn sm" id="pAdd" type="button">+ Conta</button></div></div>
-    ${UI.patUnlock ? "" : `<p class="small muted" style="margin:10px 0 0">🔒 Valores escondidos. Segure o olho para dar uma olhada, ou toque em “Mostrar para editar”.</p>`}
-    <div class="tbl-wrap secret-block" style="margin-top:14px"><table class="tbl">${head}${body}</table></div>
+      <div class="row"><div class="mnav"><button class="btn" id="pPrev" type="button" aria-label="Mês anterior">‹</button><h2 style="font-size:18px">${ymLabel(cur)}</h2><button class="btn" id="pNext" type="button" aria-label="Próximo mês">›</button></div><button class="btn sm" id="pAdd" type="button">+ Conta</button></div></div>
+    <div class="tbl-wrap" style="margin-top:14px"><table class="tbl">${head}${body}</table></div>
   </section>
   <div class="grid2">
-    <section class="card"><h2>Patrimônio líquido</h2><p class="sub">Evolução mensal.</p><div class="chart secret-block" id="cPL2"></div></section>
-    <section class="card"><h2>Composição em ${ymLabel(cur)}</h2><p class="sub">Quanto há em cada grupo.</p><div class="secret-block">${hbars(Object.entries(GRUPOS).map(([g, [l]]) => ({ k: l, v: patTot(cur)[g] })).filter(r => r.v))}</div></section>
-  </div></div>`;
-  bindEyes(v);
-  $("#pLock").onclick = () => { UI.patUnlock = !UI.patUnlock; render(); };
+    <section class="card"><h2>Patrimônio líquido</h2><p class="sub">Evolução mensal.</p><div class="chart" id="cPL2"></div></section>
+    <section class="card"><h2>Composição em ${ymLabel(cur)}</h2><p class="sub">Quanto há em cada grupo.</p>${hbars(Object.entries(GRUPOS).map(([g, [l]]) => ({ k: l, v: patTot(cur)[g] })).filter(r => r.v))}</section>
+  </div>`;
   $("#pPrev").onclick = () => { if (ix > 0) { UI.patYm = months[ix - 1]; render(); } };
   $("#pNext").onclick = () => { if (ix < months.length - 1) { UI.patYm = months[ix + 1]; render(); } else { UI.patYm = ymAdd(months[ix], 1); P.valores[UI.patYm] = P.valores[UI.patYm] || {}; render(); } };
   v.querySelectorAll("[data-val]").forEach(inp => inp.onchange = () => { const x = parseMoney(inp.value); if (isNaN(x)) { toast("Valor inválido"); return; } (P.valores[cur] = P.valores[cur] || {})[inp.dataset.val] = x; Store.savePat(); render(); });
@@ -1787,7 +2002,7 @@ function openItem(it, { confirming = false } = {}) {
 function openRec(r) {
   const c = cfg(), isNew = !r.id;
   const pags = ["Pix", "Boleto", "Débito automático", "Transferência", "Conta", ...(c.cartoes || []).map(k => k.nome)];
-  openDlg(`<h3>${isNew ? "Novo fixo" : "Editar fixo"}</h3>
+  openDlg(`<h3>${isNew ? (r.grupo === "casa" ? "Nova conta da casa" : "Novo fixo") : (r.grupo === "casa" ? "Editar conta da casa" : "Editar fixo")}</h3>
     <div class="seg" role="radiogroup" aria-label="Tipo">${Object.entries(TIPOS).map(([k, l]) => `<label><input type="radio" name="t" value="${k}" ${k === (r.t || "saida") ? "checked" : ""}>${l === "Investimento" ? "Investir" : l}</label>`).join("")}</div>
     <label class="fld"><span>Descrição</span><input type="text" id="rDesc" value="${esc(r.desc || "")}" autofocus></label>
     <div class="fld-row"><label class="fld"><span>Valor por mês (R$)</span><input type="text" id="rV" inputmode="decimal" value="${r.v != null ? num(r.v) : ""}"></label>
@@ -1796,6 +2011,8 @@ function openRec(r) {
       <label class="fld"><span>Pagamento</span><select id="rPag">${[...new Set([r.pag, ...pags].filter(Boolean))].map(p => `<option ${p === r.pag ? "selected" : ""}>${esc(p)}</option>`).join("")}</select></label></div>
     <div class="fld-row"><label class="fld"><span>Começa em</span><input type="month" id="rIni" value="${esc(r.inicio || curYm())}"></label>
       <label class="fld"><span>Última parcela (opcional)</span><input type="month" id="rFim" value="${esc(r.fim || "")}"></label></div>
+    <label class="chk"><input type="checkbox" id="rCasa" ${r.grupo === "casa" ? "checked" : ""}> 🏠 Conta da casa (aparece na aba Casa)</label>
+    <label class="chk"><input type="checkbox" id="rMedia" ${r.media ? "checked" : ""}> 📈 Prever pela média dos últimos 3 meses pagos (bom para luz, água e gás)</label>
     <p class="hint">No cartão, o dia é ignorado: o item entra na fatura do cartão. Parcelados param de aparecer depois da última parcela.</p>
     <p class="err small down" hidden></p>
     <div class="dlg-acts">${isNew ? "" : `<button class="btn danger" type="button" data-del>Apagar fixo</button>`}<button class="btn" type="button" data-cancel>Cancelar</button><button class="btn primary" type="submit">Salvar</button></div>`,
@@ -1806,6 +2023,8 @@ function openRec(r) {
     if (fim && fim < ini) return "A última parcela não pode ser antes do início.";
     const rc = readCat("rCat", t); if (rc.err) return rc.err;
     const obj = { id: r.id || uid(), desc, t, v, dia: Math.max(1, Math.min(31, +$("#rDia").value || 1)), cat: rc.cat, pag: $("#rPag").value, inicio: ini, fim };
+    if ($("#rCasa").checked) obj.grupo = "casa";
+    if ($("#rMedia").checked) obj.media = true;
     if (isNew) c.recorrentes.push(obj); else c.recorrentes[c.recorrentes.findIndex(x => x.id === r.id)] = obj;
     Store.saveConfig(); render(); toast("Fixo salvo");
   }, isNew ? null : () => { c.recorrentes = c.recorrentes.filter(x => x.id !== r.id); Store.saveConfig(); render(); toast("Fixo apagado. Lançamentos já confirmados continuam."); });
