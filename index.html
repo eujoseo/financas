@@ -419,6 +419,12 @@ dialog.wide .row{flex-wrap:wrap}
 .imp tr.off td{opacity:.5}
 .imp thead th{position:sticky;top:0;background:var(--surface-2);z-index:1}
 .tag.bank{background:var(--accent-wash);border-color:transparent}
+.cf-card{border:2px solid var(--accent, #3b82f6)}
+.cf-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--line, rgba(127,127,127,.2))}
+.cf-row>div:first-child{flex:1;min-width:0}
+.cf-v{font-variant-numeric:tabular-nums;font-weight:600;white-space:nowrap}
+.cf-acts{display:flex;gap:6px}
+@media (max-width:520px){.cf-row{flex-wrap:wrap}.cf-acts{width:100%;justify-content:flex-end}}
 .banco-st{background:var(--surface-2);border-radius:8px;padding:10px 12px;display:grid;gap:3px;font-size:13px}
 .banco-st.err-st{background:color-mix(in srgb,var(--bad, #c0392b) 12%,var(--surface))}
 .btn.warn-b{border-color:color-mix(in srgb,#d4a017 60%,var(--line))}
@@ -647,7 +653,7 @@ const Store = {
   }
 };
 const clone = o => JSON.parse(JSON.stringify(o ?? null));
-const clean = i => { const o = {}; for (const k of ["id","d","t","v","desc","cat","rec","skip","pag","parc","ext"]) if (i[k] !== undefined && i[k] !== null && i[k] !== "") o[k] = i[k]; return o; };
+const clean = i => { const o = {}; for (const k of ["id","d","t","v","desc","cat","rec","skip","pag","parc","ext","orig"]) if (i[k] !== undefined && i[k] !== null && i[k] !== "") o[k] = i[k]; return o; };
 function normConfig(c) {
   const d = DEFAULT_CONFIG(); c = clone(c) || {};
   const out = { ...d, ...c };
@@ -1155,6 +1161,27 @@ function renderNow() {
   hideTip();
   const fn = { geral: viewGeral, mes: viewMes, lanc: viewLanc, cartoes: viewCartoes, casa: viewCasa, cats: viewCats, metas: viewMetas, fixos: viewFixos, eco: viewEco, pat: viewPat }[UI.tab] || viewGeral;
   fn(v);
+  if (UI.tab === "geral" || UI.tab === "lanc") conferRender(v);
+}
+/* ───────── conferência do Open Finance (só entra nas contas depois do seu ✓) ───────── */
+const pendentesBanco = () => (cfg().banco?.pendentes || []);
+function conferRender(v) {
+  const pend = pendentesBanco(); if (!pend.length) return;
+  const td = today();
+  const meus = Object.values(S.meses).flatMap(m => m.itens || []).filter(i => !i.skip && i.d === td && !isBancoItem(i));
+  const linha = (i, acts) => `<div class="cf-row"><div><div class="d">${esc(i.desc)} <span class="tag ${i.t}">${TIPOS[i.t] || ""}</span></div><div class="m small muted">${dLabel(i.d)} · ${esc(i.cat || "sem categoria")}${i.pag ? " · " + esc(i.pag) : ""}</div></div><div class="cf-v ${i.t === "entrada" ? "up" : ""}">${i.t === "entrada" ? "+" : "−"} ${brl(i.v)}</div>${acts}</div>`;
+  const html = `<section class="card cf-card" id="confer"><div class="spread"><h2>🏦 Conferência do dia</h2><button class="btn sm primary" type="button" data-cf-all>✓ Aprovar todos (${pend.length})</button></div>
+    <p class="sub">Vieram do Nubank pelo Open Finance e ainda <b>não entram</b> nas contas. Compare com o que você lançou e aprove, edite ou descarte.</p>
+    <div class="cf-list">${pend.map(i => linha(i, `<div class="cf-acts"><button class="btn sm primary" type="button" data-cf-ok="${esc(i.ext)}" title="Aprovar">✓</button><button class="btn sm" type="button" data-cf-ed="${esc(i.ext)}" title="Aprovar e editar">✏️</button><button class="btn sm danger" type="button" data-cf-no="${esc(i.ext)}" title="Descartar (já lancei ou não quero)">✕</button></div>`)).join("")}</div>
+    ${meus.length ? `<p class="small muted" style="margin:12px 0 4px">Lançados por você hoje, para comparar:</p><div class="cf-list">${meus.map(i => linha(i, `<div class="cf-acts small">${i.orig === "bot" ? "🤖" : "✍️"}</div>`)).join("")}</div>` : ""}</section>`;
+  v.insertAdjacentHTML("afterbegin", html);
+  const box = $("#confer");
+  const tira = ext => { const b = cfg().banco; b.pendentes = (b.pendentes || []).filter(x => x.ext !== ext); };
+  const aprova = ext => { const it = pendentesBanco().find(x => x.ext === ext); if (!it) return null; tira(ext); const ym = it.d.slice(0, 7), m = S.meses[ym] || (S.meses[ym] = { itens: [] }); m.itens.push(clean(it)); m.itens.sort((a, x) => a.d.localeCompare(x.d)); Store.saveMonth(ym); return it; };
+  box.querySelector("[data-cf-all]").onclick = () => { const n = pendentesBanco().length; [...pendentesBanco()].forEach(i => aprova(i.ext)); Store.saveConfig(); render(); toast(`✓ ${n} aprovada${n > 1 ? "s" : ""}`); };
+  box.querySelectorAll("[data-cf-ok]").forEach(b => b.onclick = () => { const it = aprova(b.dataset.cfOk); Store.saveConfig(); render(); if (it) toast("✓ Aprovado: " + it.desc); });
+  box.querySelectorAll("[data-cf-ed]").forEach(b => b.onclick = () => { const it = aprova(b.dataset.cfEd); Store.saveConfig(); render(); if (it) openItem(findItem(it.id)); });
+  box.querySelectorAll("[data-cf-no]").forEach(b => b.onclick = () => { tira(b.dataset.cfNo); Store.saveConfig(); render(); toast("Descartado"); });
 }
 /* ───────── configuração inicial (passo a passo) ───────── */
 const WZ_KEY = "fj-setup-draft";
@@ -1647,7 +1674,7 @@ function viewLanc(v) {
     </div>
     <p class="small muted" style="margin:0 0 6px">${list.length} lançamento${list.length === 1 ? "" : "s"} · entradas ${brl(tot("entrada"))} · saídas ${brl(tot("saida"))} · diário ${brl(tot("diario"))} · investido ${brl(tot("invest"))}</p>
     <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Data</th><th>Descrição</th><th>Categoria</th><th>Tipo</th><th class="n">Valor</th></tr></thead><tbody>
-      ${list.length ? list.slice(0, 600).map(i => `<tr class="click" data-id="${esc(i.id)}" tabindex="0"><td class="num">${dLabel(i.d)}/${i.d.slice(2, 4)}</td><td>${esc(i.desc)}${isBancoItem(i) ? ' <span class="tag bank" title="Conferido no extrato do banco">🏦</span>' : ""}${i.rec ? ' <span class="tag">fixo</span>' : ""}${isCardItem(i) ? ` <span class="tag card">💳 ${parcN(i) > 1 ? parcN(i) + "x" : "cartão"}</span>` : ""}</td><td>${esc(i.cat || "")}</td><td><span class="tag ${i.t}">${TIPOS[i.t]}</span></td><td class="n ${i.t === "entrada" ? "up" : ""}">${i.t === "entrada" ? "+" : "−"} ${num(i.v)}</td></tr>`).join("") : `<tr><td colspan="5"><div class="empty">Nenhum lançamento com esses filtros.</div></td></tr>`}
+      ${list.length ? list.slice(0, 600).map(i => `<tr class="click" data-id="${esc(i.id)}" tabindex="0"><td class="num">${dLabel(i.d)}/${i.d.slice(2, 4)}</td><td>${esc(i.desc)}${isBancoItem(i) ? ' <span class="tag bank" title="Conferido no extrato do banco">🏦</span>' : ""}${i.orig === "bot" ? ' <span class="tag" title="Lançado pelo Telegram">🤖</span>' : ""}${i.rec ? ' <span class="tag">fixo</span>' : ""}${isCardItem(i) ? ` <span class="tag card">💳 ${parcN(i) > 1 ? parcN(i) + "x" : "cartão"}</span>` : ""}</td><td>${esc(i.cat || "")}</td><td><span class="tag ${i.t}">${TIPOS[i.t]}</span></td><td class="n ${i.t === "entrada" ? "up" : ""}">${i.t === "entrada" ? "+" : "−"} ${num(i.v)}</td></tr>`).join("") : `<tr><td colspan="5"><div class="empty">Nenhum lançamento com esses filtros.</div></td></tr>`}
     </tbody></table></div></section>`;
   $("#lAdd").onclick = () => openItem({ d: defaultDate(), t: "diario" });
   $("#lImp").onclick = () => $("#extIn").click();
@@ -2066,7 +2093,10 @@ function resumoIA() {
       patrimonio: pt ? { mes: lp, liquido: pt.pl, bruto: pt.total, reserva: pt.reserva, investimentos: pt.invest, outros: pt.outros, dividas: pt.divida } : null,
       financiamento: f ? (() => { const sim = finSim(finSaldo(), finPrazo(), f.taxa, f.sist); return { saldoDevedor: finSaldo(), parcelasRestantes: sim.meses, terminaEm: ymAdd(cy, sim.meses - 1), jurosRestantes: sim.juros, taxaAnualPct: +f.taxa, sistema: f.sist }; })() : null,
       mesAnterior: fc ? { mes: prev, entradas: fc.m.ent, gastos: fc.gastos, investido: fc.m.inv, resultado: fc.resultado, economiaPct: fc.eco == null ? null : r2(fc.eco * 100), maiorCategoria: fc.top ? { nome: fc.top[0], total: fc.top[1].total } : null, fixosSemConfirmar: fc.pend, patrimonioAtualizado: fc.patOk } : null,
-      historico6Meses: hist
+      historico6Meses: hist,
+      // previsão mês a mês (com fixos, faturas já parceladas e o orçamento do diário): usada pelo bot do Telegram em "posso comprar?"
+      projecao: CALC.order.filter(ym => ym >= cy).slice(0, 13).map(ym => { const x = M(ym); return { mes: ym, entradas: r2(x.ent + x.pEnt), saidas: r2(x.sai + x.pSai), diario: r2(x.dia + x.pDia), livre: r2(x.ent + x.pEnt - x.sai - x.pSai - x.dia - x.pDia), saldoFim: x.saldoFim }; }),
+      pendentesBanco: (c.banco?.pendentes || []).map(i => ({ d: i.d, desc: i.desc, v: +i.v, t: i.t }))
     };
   } catch (e) { return { erro: String(e && e.message || e) }; }
 }
@@ -2297,7 +2327,7 @@ function bancoPlano(j, b) {
     const ext = "pluggy:" + t.id, v = r2(+t.valor || 0);
     out.marcar[t.id] = t.data;
     if (!v || t.data < ini || t.data < desde || (!t.saida && !b.entradas)) { out.ignorados++; continue; }
-    if (exist.some(i => i.ext === ext) || out.novos.some(i => i.ext === ext)) continue;
+    if (exist.some(i => i.ext === ext) || out.novos.some(i => i.ext === ext) || (b.pendentes || []).some(i => i.ext === ext)) continue;
     const ym = t.data.slice(0, 7), entrada = !t.saida;
     // 1) você já lançou à mão (mesmo valor, até 3 dias de diferença): só marca como conferido
     const manual = exist.filter(i => !isBancoItem(i) && !used.has(i.id) && !isCardItem(i) && (i.t === "entrada") === entrada && Math.abs(+i.v - v) < 0.01 && Math.abs(diasEntre(i.d, t.data)) <= 3)
@@ -2342,7 +2372,7 @@ async function bancoSync(manual) {
     const j = await bancoBuscar(b, desde);
     const c = cfg(), bb = c.banco; if (!bb) return null;
     const plan = bancoPlano(j, bb), touched = new Set();
-    for (const it of plan.novos) { const ym = it.d.slice(0, 7), m = S.meses[ym] || (S.meses[ym] = { itens: [] }); m.itens.push(it); touched.add(ym); }
+    bb.pendentes = [...(bb.pendentes || []), ...plan.novos.filter(n => !(bb.pendentes || []).some(x => x.ext === n.ext))].sort((a, x) => a.d.localeCompare(x.d));   // só entram nas contas depois do seu ✓
     for (const k of plan.concil) { const it = (S.meses[k.ym]?.itens || []).find(i => i.id === k.id); if (it) { it.ext = k.ext; touched.add(k.ym); } }
     for (const ym of touched) { S.meses[ym].itens.sort((a, x) => a.d.localeCompare(x.d)); Store.saveMonth(ym); }
     const lim = addDays(today(), -150), vistos = { ...(bb.vistos || {}), ...plan.marcar };
@@ -2351,7 +2381,7 @@ async function bancoSync(manual) {
     Object.assign(bb, { vistos, ultimo: new Date().toISOString(), ultimoDia: dias.length ? dias[dias.length - 1] : (bb.ultimoDia || today()), contas: (j.contas || []).map(x => ({ nome: x.nome, banco: x.banco, saldo: x.saldo, atualizadoEm: x.atualizadoEm })), erro: null });
     Store.saveConfig(); render();
     const n = plan.novos.length, k = plan.concil.length;
-    if (n || k || manual) toast(n ? `🏦 ${n} movimentaç${n > 1 ? "ões" : "ão"} do Nubank lançada${n > 1 ? "s" : ""}${k ? ` · ${k} já estava${k > 1 ? "m" : ""} lançada${k > 1 ? "s" : ""}` : ""}` : k ? `🏦 ${k} lançamento${k > 1 ? "s" : ""} conferido${k > 1 ? "s" : ""} com o Nubank` : "🏦 Nubank em dia: nada novo.");
+    if (n || k || manual) toast(n ? `🏦 ${n} movimentaç${n > 1 ? "ões" : "ão"} do Nubank aguardando sua conferência${k ? ` · ${k} já estava${k > 1 ? "m" : ""} lançada${k > 1 ? "s" : ""}` : ""}` : k ? `🏦 ${k} lançamento${k > 1 ? "s" : ""} conferido${k > 1 ? "s" : ""} com o Nubank` : "🏦 Nubank em dia: nada novo.");
     return plan;
   } catch (e) {
     const bb = cfg().banco; const msg = String(e.message || e);
@@ -2380,7 +2410,7 @@ function openBancoDlg() {
   const c = cfg(), b = c.banco || null;
   const defDesde = b?.desde || [inicioDe(), addDays(today(), -7)].sort()[1];
   openDlg(`<h3>🏦 Nubank automático</h3>
-    <p class="hint" style="margin:0">As compras no débito e os Pix da sua conta entram sozinhos no diário, com a categoria sugerida, marcados com 🏦. O banco manda os dados pelo Open Finance (Meu Pluggy) uma vez por dia. Se você já lançou à mão, o app só confere e não duplica.</p>
+    <p class="hint" style="margin:0">As compras no débito e os Pix da sua conta chegam sozinhos, com a categoria sugerida, e ficam em “Conferência do dia” até você dar o ✓; só então entram nas contas (marcados com 🏦). O banco manda os dados pelo Open Finance (Meu Pluggy) uma vez por dia. Se você já lançou à mão, o app só confere e não duplica.</p>
     ${bancoStatusHtml(b)}
     <label class="fld"><span>URL do App da Web (Apps Script)</span><input type="url" id="bUrl" value="${esc(b?.url || "")}" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off"></label>
     <label class="fld"><span>Código secreto</span><input type="text" id="bTok" value="${esc(b?.token || "")}" placeholder="aparece ao rodar “configurar” no Apps Script" autocomplete="off" spellcheck="false"></label>
