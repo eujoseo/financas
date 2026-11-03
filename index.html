@@ -1,4 +1,48 @@
 <!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style></head><body><title>Finanças do José</title>
+<style id="lock-css">
+html.trancado body>*:not(#cadeado){visibility:hidden}
+#cadeado{position:fixed;inset:0;z-index:99999;display:grid;place-items:center;background:#0f1a17;color:#eef3f0;font:16px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;padding:16px}
+#cadeado .cx{width:min(340px,100%);display:grid;gap:12px;text-align:center}
+#cadeado h1{margin:0 0 4px;font-size:1.4rem}
+#cadeado input{font:inherit;font-size:1.4rem;letter-spacing:.4em;text-align:center;padding:12px;border-radius:10px;border:1px solid #2f4a42;background:#16261f;color:inherit}
+#cadeado button{font:inherit;font-weight:600;padding:11px;border-radius:10px;border:0;background:#3fa37a;color:#08130f;cursor:pointer}
+#cadeado .lnk{background:none;color:#9fc7b6;font-weight:500;padding:4px}
+#cadeado .msg{min-height:1.3em;color:#f2a58e;font-size:.9rem}
+#cadeado .dica{color:#9fc7b6;font-size:.9rem}
+</style>
+<script>document.documentElement.classList.add('trancado');</script>
+<div id="cadeado" role="dialog" aria-modal="true" aria-label="Senha">
+ <form class="cx" id="cad-form" autocomplete="off">
+  <div style="font-size:2rem">🔒</div><h1>Finanças do José</h1>
+  <input id="cad-in" type="password" inputmode="numeric" placeholder="Senha" aria-label="Senha" autofocus>
+  <button type="submit" id="cad-btn">Entrar</button>
+  <div class="msg" id="cad-msg" aria-live="polite"></div>
+  <button type="button" class="lnk" id="cad-esq">Esqueci a senha</button>
+ </form>
+</div>
+<script>
+(function(){
+  const P='df698b1db715b24d1ee67ce5df4a0890d43f190189c3db943651e9ca75a4900a', R='4e392022cb3a0d1b19d4df7e09519bd866c1868e145c8f9e886266b164d23d46';
+  let ok=false; try{ ok = sessionStorage.getItem('fin_ok')==='1'; }catch(e){}
+  const el=document.getElementById('cadeado');
+  function abrir(){ try{sessionStorage.setItem('fin_ok','1');}catch(e){} document.documentElement.classList.remove('trancado'); el.remove(); }
+  if(ok){ abrir(); return; }
+  async function h(s){ const b=await crypto.subtle.digest('SHA-256', new TextEncoder().encode('financas-jose:'+s.trim().toLowerCase())); return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join(''); }
+  let modo='senha';
+  const inp=document.getElementById('cad-in'), msg=document.getElementById('cad-msg'), esq=document.getElementById('cad-esq');
+  esq.onclick=()=>{ modo = modo==='senha'?'palavra':'senha'; inp.value=''; msg.textContent='';
+    if(modo==='palavra'){ inp.type='text'; inp.removeAttribute('inputmode'); inp.placeholder='Palavra secreta'; inp.style.letterSpacing='.05em'; esq.textContent='Voltar para a senha'; msg.innerHTML='<span class="dica">Dica: infância</span>'; }
+    else{ inp.type='password'; inp.setAttribute('inputmode','numeric'); inp.placeholder='Senha'; inp.style.letterSpacing=''; esq.textContent='Esqueci a senha'; }
+    inp.focus(); };
+  document.getElementById('cad-form').onsubmit=async e=>{ e.preventDefault();
+    const v=await h(inp.value);
+    if(modo==='senha' && v===P) return abrir();
+    if(modo==='palavra' && v===R){ return abrir(); }
+    msg.textContent = modo==='senha' ? 'Senha incorreta.' : 'Palavra secreta incorreta. Dica: infância';
+    inp.value=''; inp.focus(); };
+})();
+</script>
+
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
