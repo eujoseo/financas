@@ -84,7 +84,6 @@ function montarResumo_() {
     vencimentos: venc,
     atrasados: (r.fixosVencidosSemConfirmar || []).length,
     faturas: faturas,
-    pendentesBanco: pendentes_(dados).length,
     reservaMeses: r.reserva ? r.reserva.mesesCobertos : null
   };
 }
@@ -237,20 +236,15 @@ function cmdDesfazer_() {
 function cmdHoje_() {
   const dados = lerDados_().dados, h = hoje_();
   const its = itensDoDia_(dados, h);
-  const pend = pendentes_(dados);
   let r = '📋 <b>Hoje (' + br_(h) + ')</b>\n';
   if (!its.length) r += 'Nenhum lançamento ainda.\n';
   its.forEach(function (i) {
-    r += (i.t === 'entrada' ? '＋ ' : '－ ') + esc_(i.desc) + ' · ' + brl_(i.v) + (i.parc ? ' (' + i.parc + 'x)' : '') + (i.orig === 'bot' ? ' 🤖' : '') + (String(i.ext || '').indexOf('pluggy:') === 0 ? ' 🏦' : '') + '\n';
+    r += (i.t === 'entrada' ? '＋ ' : '－ ') + esc_(i.desc) + ' · ' + brl_(i.v) + (i.parc ? ' (' + i.parc + 'x)' : '') + (i.orig === 'bot' ? ' 🤖' : '') + '\n';
   });
   const dia = soma_(its.filter(function (i) { return i.t === 'diario'; }));
   r += '\nDiário de hoje: <b>' + brl_(dia) + '</b>';
   const w = tentar_(montarResumo_);
   if (w && w.sobraHoje != null) r += '\n' + (w.sobraHoje >= 0 ? 'Ainda pode gastar hoje: <b>' + brl_(w.sobraHoje) + '</b>' : 'Passou ' + brl_(-w.sobraHoje) + ' do previsto para hoje');
-  if (pend.length) {
-    r += '\n\n🏦 <b>' + pend.length + ' do Nubank esperando seu ✓</b>\n';
-    pend.slice(0, 10).forEach(function (i) { r += '• ' + br_(i.d) + ' ' + esc_(i.desc) + ' · ' + brl_(i.v) + '\n'; });
-  }
   return r;
 }
 
@@ -334,15 +328,13 @@ function lembrete20h() {
   if (!PropertiesService.getScriptProperties().getProperty('TG_CHAT')) return;
   const dados = lerDados_().dados, h = hoje_();
   const its = itensDoDia_(dados, h);
-  const pend = pendentes_(dados);
   let r = '🌙 <b>Hora de conferir o dia!</b>\n\n';
   if (its.length) {
     r += 'Você lançou hoje:\n';
     its.forEach(function (i) { r += '• ' + esc_(i.desc) + ' · ' + brl_(i.v) + (i.orig === 'bot' ? ' 🤖' : '') + '\n'; });
     r += 'Diário de hoje: <b>' + brl_(soma_(its.filter(function (i) { return i.t === 'diario'; }))) + '</b>\n';
   } else r += 'Nenhum gasto lançado hoje. Esqueceu algum? É só me mandar, ex.: <code>32 almoço</code>\n';
-  if (pend.length) r += '\n🏦 ' + pend.length + ' movimentaç' + (pend.length > 1 ? 'ões' : 'ão') + ' do Nubank esperando seu ✓.\n';
-  r += '\nAbra o app para puxar o Nubank e aprovar na <b>Conferência do dia</b>:\n' + SITE;
+  r += '\nAbra o app para conferir: ' + SITE;
   enviar_(r);
 }
 
@@ -392,7 +384,6 @@ function todosItens_(dados) {
 }
 function itensDoMes_(dados, ym) { return ((dados.meses || {})[ym] || { itens: [] }).itens.filter(function (i) { return !i.skip; }); }
 function itensDoDia_(dados, d) { return itensDoMes_(dados, d.slice(0, 7)).filter(function (i) { return i.d === d; }); }
-function pendentes_(dados) { return ((dados.config || {}).banco || {}).pendentes || []; }
 
 function categoria_(dados, t, desc) {
   const cats = (((dados.config || {}).categorias || {})[t] || []);
