@@ -32,11 +32,13 @@ function configurar() {
 function doGet(e) {
   const token = PropertiesService.getScriptProperties().getProperty('TOKEN');
   if (!token || !e || !e.parameter || e.parameter.token !== token) {
-    return json_({ ok: false, msg: 'Código secreto inválido.' });
+    console.warn('widget: código secreto inválido (' + (e && e.parameter && e.parameter.token ? 'recebido ' + String(e.parameter.token).length + ' caracteres' : 'nenhum código') + ')');
+    return json_({ ok: false, codigo: 'token', msg: 'Código secreto inválido.' });
   }
   try {
     return json_(montarResumo_());
   } catch (err) {
+    console.error('widget: ' + (err && err.stack || err));
     return json_({ ok: false, msg: String(err && err.message || err) });
   }
 }
@@ -223,6 +225,7 @@ function responder_(txt) {
   if (cmd === 'start' || cmd === 'ajuda' || cmd === 'help') return 'Oi, José! 👋\n\n' + AJUDA;
   if (cmd === 'hoje') return cmdHoje_();
   if (cmd === 'saldo') return cmdSaldo_();
+  if (cmd === 'widget') return textoCodigoWidget_();
   if (cmd === 'desfazer') return cmdDesfazer_();
   if (cmd === 'posso') return cmdPosso_(resto);
   if (cmd === 'parcelado' || cmd === 'parcela') return cmdLancar_('parcelado', resto);
@@ -447,6 +450,14 @@ function tg_(metodo, corpo) {
   if (!j.ok) throw new Error('Telegram: ' + j.description);
   return j;
 }
+
+// manda pelo Telegram o código secreto do widget (só para o seu chat)
+function textoCodigoWidget_() {
+  const token = PropertiesService.getScriptProperties().getProperty('TOKEN');
+  return '📲 <b>Código secreto do widget</b>\n<code>' + token + '</code>\n\n' +
+    'Toque no código para copiar. Depois abra o Scriptable, toque no script do widget e cole quando ele pedir.';
+}
+function enviarCodigoWidget() { enviar_(textoCodigoWidget_()); }
 
 function enviar_(texto) {
   const chat = PropertiesService.getScriptProperties().getProperty('TG_CHAT');

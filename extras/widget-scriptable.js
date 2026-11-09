@@ -8,16 +8,44 @@ const SITE = "https://eujoseo.github.io/financas/";
 const fm = FileManager.local();
 const CACHE = fm.joinPath(fm.documentsDirectory(), "financas-widget.json");
 
+// código secreto: o guardado no iPhone (Keychain) vale mais que o escrito no topo do script
+const CHAVE = "financas-widget-token";
+const codigoSecreto = () => Keychain.contains(CHAVE) ? Keychain.get(CHAVE) : TOKEN;
+
+async function pedirCodigo() {
+  const a = new Alert();
+  a.title = "Código secreto do widget";
+  a.message = "Cole o código que o bot do Telegram mandou (comando /widget).";
+  a.addTextField("código", "");
+  a.addAction("Salvar"); a.addCancelAction("Cancelar");
+  if (await a.presentAlert() === -1) return false;
+  const c = a.textFieldValue(0).trim();
+  if (!c) return false;
+  Keychain.set(CHAVE, c);
+  return true;
+}
+
+async function buscar() {
+  const req = new Request(`${URL_API}?token=${encodeURIComponent(codigoSecreto())}`);
+  req.timeoutInterval = 20;
+  return await req.loadJSON();
+}
+
 async function carregar() {
+  // link do Telegram com ?token=... também grava o código
+  if (args.queryParameters && args.queryParameters.token) Keychain.set(CHAVE, args.queryParameters.token);
   try {
-    const req = new Request(`${URL_API}?token=${encodeURIComponent(TOKEN)}`);
-    req.timeoutInterval = 20;
-    const j = await req.loadJSON();
-    if (!j.ok) throw new Error(j.msg || "Erro no Apps Script");
+    let j = await buscar();
+    if (!j.ok && j.codigo === "token" && config.runsInApp && await pedirCodigo()) j = await buscar();
+    // erro do servidor (código errado etc.): mostra o erro em vez de dados velhos
+    if (!j.ok) return { ok: false, msg: j.codigo === "token"
+      ? "Código secreto inválido. Mande /widget para o bot no Telegram, abra o Scriptable, toque neste script e cole o código."
+      : (j.msg || "Erro no Apps Script") };
     j._offline = false;
     fm.writeString(CACHE, JSON.stringify(j));
     return j;
   } catch (e) {
+    // sem internet: usa a última cópia boa
     if (fm.fileExists(CACHE)) {
       const j = JSON.parse(fm.readString(CACHE));
       j._offline = true;
@@ -162,7 +190,7 @@ function rodape(d) {
 function erro(w, msg) {
   if (!config.runsInAccessoryWidget) { w.backgroundColor = fundo; w.setPadding(12, 12, 12, 12); }
   txt(w, "💸 Finanças", 12, { bold: true });
-  txt(w, msg, 10, { lines: 3 });
+  txt(w, msg, 10, { lines: config.runsInAccessoryWidget ? 3 : 6 });
 }
 
 // ───────── atualização automática do próprio código ─────────
