@@ -62,20 +62,28 @@ function montarResumo_() {
   const porDia = orc ? arred_(restanteAntesDeHoje / diasRestantes) : null;
   const sobraOrcamento = porDia == null ? null : arred_(porDia - gastoHoje);
 
-  // dinheiro em conta: o resumo é do momento em que o app salvou; desconta o que entrou depois
-  // (bot ou app), menos compras no cartão, que só saem da conta na fatura
-  const cartoes = ((dados.config || {}).cartoes || []).map(function (c) { return c.nome; });
-  const desde = r.geradoEm || '';
-  const mudouConta = [mesAtual, somaMes_(mesAtual, -1)].reduce(function (acc, ym) { return acc.concat(itensDoMes_(dados, ym)); }, [])
-    .filter(function (i) { return i.em && i.em > desde && cartoes.indexOf(i.pag) < 0; })
-    .reduce(function (s, i) { return s + (i.t === 'entrada' ? 1 : -1) * (+i.v || 0); }, 0);
-  const saldoConta = r.saldoEmContaHoje == null ? null : arred_(+r.saldoEmContaHoje + mudouConta);
-  const cx = r.caixa || null;
-  const livreConta = cx ? Math.max(0, arred_(+cx.menor + mudouConta)) : (saldoConta == null ? null : Math.max(0, saldoConta));
+  // ── dinheiro em conta ──
+  // o saldo do resumo é do momento em que o app salvou; aqui entra o que foi lançado depois
+  // (compras no cartão não saem da conta agora, só na fatura)
+  const cfg = dados.config || {};
+  const cartoes = (cfg.cartoes || []).map(function (c) { return c.nome; });
+  const naConta = function (i) { return cartoes.indexOf(i.pag) < 0 || i.t === 'entrada'; };
+  const efeito = function (i) { return (i.t === 'entrada' ? 1 : -1) * (+i.v || 0); };
+  const desde = r.geradoEm || '', diaResumo = r.hoje || hoje;
+  const recentes = [somaMes_(mesAtual, -1), mesAtual].reduce(function (acc, ym) { return acc.concat(itensDoMes_(dados, ym)); }, [])
+    .filter(function (i) { return naConta(i) && i.d <= hoje && ((i.em && i.em > desde) || (i.d > diaResumo && !(i.em && i.em > desde))); });
+  const saldoConta = r.saldoEmContaHoje == null ? null : arred_(+r.saldoEmContaHoje + recentes.reduce(function (s, i) { return s + efeito(i); }, 0));
 
-  // pode gastar hoje = o que sobra do orçamento de hoje, limitado ao que a conta aguenta
-  let sobraHoje = sobraOrcamento, limitadoPelaConta = false;
-  if (sobraHoje != null && livreConta != null && sobraHoje > livreConta) { sobraHoje = livreConta; limitadoPelaConta = true; }
+  // caminho do saldo dia a dia: lançamentos futuros + fixos e faturas previstos, sem o diário
+  const cx = saldoConta == null ? null : caixa_(dados, r, hoje, saldoConta, cartoes, naConta, efeito);
+
+  // pode gastar hoje: o menor entre a sobra do orçamento e o que a conta aguenta por dia até o dinheiro entrar
+  let sobraHoje = sobraOrcamento, limitadoPelaConta = false, porDiaConta = null;
+  if (cx) {
+    porDiaConta = arred_((cx.menorAteEntrada + gastoHoje) / cx.diasAteEntrada);
+    const podeConta = arred_(porDiaConta - gastoHoje);
+    if (sobraHoje == null || podeConta < sobraHoje) { sobraHoje = podeConta; limitadoPelaConta = true; }
+  }
 
   const venc = (r.vencimentosProximos7Dias || [])
     .filter(function (v) { return v.d >= hoje; })
@@ -90,9 +98,10 @@ function montarResumo_() {
   return {
     ok: true, hoje: hoje, atualizadoEm: r.geradoEm, consultadoEm: new Date().toISOString(), dadosDeHoje: r.hoje === hoje,
     saldoConta: saldoConta, gastoHoje: arred_(gastoHoje), porDia: porDia, sobraHoje: sobraHoje,
-    sobraOrcamento: sobraOrcamento, livreConta: livreConta, limitadoPelaConta: limitadoPelaConta,
-    faltaNaConta: cx && +cx.menor + mudouConta < 0 ? { v: arred_(-(+cx.menor + mudouConta)), d: cx.menorEm } : null,
-    proximaEntrada: cx ? cx.proximaEntrada : null,
+    sobraOrcamento: sobraOrcamento, limitadoPelaConta: limitadoPelaConta, porDiaConta: porDiaConta,
+    livreConta: cx ? Math.max(0, cx.menorAteEntrada) : null,
+    faltaNaConta: cx && cx.menor < 0 ? { v: arred_(-cx.menor), d: cx.menorEm, desc: cx.menorDesc } : null,
+    proximaEntrada: cx ? cx.proximaEntrada : null, diasAteEntrada: cx ? cx.diasAteEntrada : null,
     diasRestantes: diasRestantes,
     mes: m ? {
       orcamentoDiario: orc, gastoDiario: arred_(diarioMes), usoPct: orc ? Math.round(diarioMes / orc * 100) : null,
@@ -104,6 +113,52 @@ function montarResumo_() {
     faturas: faturas,
     reservaMeses: r.reserva ? r.reserva.mesesCobertos : null
   };
+}
+
+// Projeta o saldo em conta de hoje até o fim do mês seguinte.
+// Devolve o menor saldo antes da próxima entrada, o menor saldo do período e onde ele acontece.
+function caixa_(dados, r, hoje, saldo, cartoes, naConta, efeito) {
+  const cfg = dados.config || {};
+  const mesAtual = hoje.slice(0, 7), meses = [mesAtual, somaMes_(mesAtual, 1)];
+  const porDia = {};
+  const add = function (d, v, desc) { (porDia[d] = porDia[d] || []).push({ v: v, desc: desc }); };
+  meses.forEach(function (ym) {
+    const todos = ((dados.meses || {})[ym] || { itens: [] }).itens;   // inclui os pulados: marcam fixo resolvido no mês
+    const cobertos = {};
+    todos.forEach(function (i) { if (i.rec) cobertos[i.rec] = true; });
+    // lançamentos com data futura
+    todos.filter(function (i) { return !i.skip && i.d > hoje && naConta(i); }).forEach(function (i) { add(i.d, efeito(i), i.desc); });
+    // fixos previstos
+    const n = diasNoMes_(ym);
+    (cfg.recorrentes || []).forEach(function (f) {
+      if (ym < (cfg.inicioPrevisao || '0000-00') || ym < (f.inicio || '0000-00') || (f.fim && ym > f.fim)) return;
+      if (cobertos[f.id] || (cartoes.indexOf(f.pag) >= 0 && f.t !== 'entrada')) return;
+      const d = ym + '-' + pad_(Math.min(+f.dia || 1, n));
+      if (d < hoje) return;
+      add(d, (f.t === 'entrada' ? 1 : -1) * (+f.v || 0), f.desc);
+    });
+    // faturas do cartão (o valor do mês atual vem do app)
+    (r.faturas || []).forEach(function (f) {
+      if (f.paga || !(+f.total > 0) || f.vencimento.slice(0, 7) !== ym || cobertos['fatura:' + f.cartao] || f.vencimento < hoje) return;
+      add(f.vencimento, -(+f.total), 'Fatura ' + f.cartao);
+    });
+  });
+
+  let cash = saldo, menor = saldo, menorEm = hoje, menorDesc = null, menorAteEntrada = saldo, prox = null;
+  const fim = meses[1] + '-' + pad_(diasNoMes_(meses[1]));
+  let dias = 0;
+  for (let d = hoje; d <= fim; d = somaDias_(d, 1)) {
+    const mov = (porDia[d] || []).slice().sort(function (a, b) { return b.v - a.v; });   // entradas do dia primeiro
+    const ent = mov.filter(function (x) { return x.v > 0; }).reduce(function (s, x) { return s + x.v; }, 0);
+    if (!prox && d > hoje && ent > 0) prox = { d: d, v: arred_(ent) };
+    if (!prox) dias++;
+    mov.forEach(function (x) {
+      cash = arred_(cash + x.v);
+      if (cash < menor) { menor = cash; menorEm = d; menorDesc = x.desc; }
+      if (!prox && cash < menorAteEntrada) menorAteEntrada = cash;
+    });
+  }
+  return { menor: menor, menorEm: menorEm, menorDesc: menorDesc, menorAteEntrada: menorAteEntrada, proximaEntrada: prox, diasAteEntrada: Math.max(1, dias) };
 }
 
 /* ═════════════ Telegram: configuração ═════════════ */
