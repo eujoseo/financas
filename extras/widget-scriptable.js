@@ -32,6 +32,12 @@ const brl = (v, cent = false) => v == null ? "–" :
   "R$ " + Number(v).toLocaleString("pt-BR", { minimumFractionDigits: cent ? 2 : 0, maximumFractionDigits: cent ? 2 : 0 });
 const ddmm = s => s ? `${s.slice(8, 10)}/${s.slice(5, 7)}` : "";
 const hora = iso => { const d = new Date(iso); return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`; };
+const diaHora = iso => { const d = new Date(iso); return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")} ${hora(iso)}`; };
+// por que o valor de hoje é esse: orçamento do dia ou dinheiro em conta
+const motivo = d => d.sobraHoje != null && d.sobraHoje < 0 ? "acima do previsto hoje"
+  : d.limitadoPelaConta ? `limitado ao saldo em conta${d.proximaEntrada ? ` até ${ddmm(d.proximaEntrada.d)}` : ""}`
+  : `${brl(d.porDia)}/dia até o fim do mês`;
+const corMotivo = (d, normal) => d.sobraHoje != null && d.sobraHoje < 0 ? VERMELHO : d.limitadoPelaConta ? AMARELO : normal;
 
 const VERDE = new Color("#34C759"), AMARELO = new Color("#FFCC00"), VERMELHO = new Color("#FF453A");
 const corUso = pct => pct == null ? Color.gray() : pct > 100 ? VERMELHO : pct > 85 ? AMARELO : VERDE;
@@ -67,9 +73,10 @@ function lockRetangular(w, d) {
   const linha1 = w.addStack(); linha1.centerAlignContent();
   txt(linha1, "💸 ", 12);
   txt(linha1, sobra == null ? "Sem orçamento" : sobra >= 0 ? `Pode gastar ${brl(sobra)}` : `Passou ${brl(-sobra)}`, 14, { bold: true });
-  txt(w, `Hoje ${brl(d.gastoHoje)} · ${d.porDia == null ? "" : `${brl(d.porDia)}/dia`}`, 12);
+  txt(w, d.limitadoPelaConta ? `Hoje ${brl(d.gastoHoje)} · saldo ${brl(d.saldoConta)}` : `Hoje ${brl(d.gastoHoje)} · ${d.porDia == null ? "" : `${brl(d.porDia)}/dia`}`, 12);
   const v = d.vencimentos && d.vencimentos[0];
-  if (d.atrasados) txt(w, `⚠️ ${d.atrasados} conta(s) atrasada(s)`, 12);
+  if (d.faltaNaConta) txt(w, `⚠️ Falta ${brl(d.faltaNaConta.v)} em ${ddmm(d.faltaNaConta.d)}`, 12);
+  else if (d.atrasados) txt(w, `⚠️ ${d.atrasados} conta(s) atrasada(s)`, 12);
   else if (v) txt(w, `📅 ${ddmm(v.d)} ${v.desc} ${brl(v.v)}`, 12);
   else if (d.mes) txt(w, `Mês: ${d.mes.usoPct}% do diário`, 12);
 }
@@ -95,7 +102,7 @@ function pequeno(w, d) {
   w.addSpacer(2);
   const s = d.sobraHoje;
   txt(w, s == null ? "–" : brl(Math.abs(s)), 28, { bold: true, color: s != null && s < 0 ? VERMELHO : texto });
-  if (s != null && s < 0) txt(w, "acima do previsto hoje", 10, { color: VERMELHO });
+  txt(w, motivo(d), 9, { color: corMotivo(d, suave), lines: 2 });
   w.addSpacer();
   txt(w, `Gasto hoje ${brl(d.gastoHoje)}`, 12, { color: texto });
   txt(w, `Saldo ${brl(d.saldoConta)}`, 12, { color: texto });
@@ -115,7 +122,7 @@ function medio(w, d) {
   txt(esq, "PODE GASTAR HOJE", 10, { semi: true, color: suave });
   const s = d.sobraHoje;
   txt(esq, s == null ? "–" : brl(Math.abs(s)), 30, { bold: true, color: s != null && s < 0 ? VERMELHO : texto });
-  txt(esq, s != null && s < 0 ? "acima do previsto hoje" : `${brl(d.porDia)}/dia até o fim do mês`, 10, { color: s != null && s < 0 ? VERMELHO : suave });
+  txt(esq, motivo(d), 10, { color: corMotivo(d, suave) });
 
   topo.addSpacer();
 
@@ -135,13 +142,21 @@ function medio(w, d) {
   w.addSpacer(6);
 
   let aviso = null;
-  if (d.atrasados) aviso = [`⚠️ ${d.atrasados} conta(s) fixa(s) vencida(s) sem confirmar`, VERMELHO];
+  if (d.faltaNaConta) aviso = [`⚠️ Faltam ${brl(d.faltaNaConta.v)} na conta em ${ddmm(d.faltaNaConta.d)} para as contas previstas`, VERMELHO];
+  else if (d.atrasados) aviso = [`⚠️ ${d.atrasados} conta(s) fixa(s) vencida(s) sem confirmar`, VERMELHO];
   else if (d.vencimentos && d.vencimentos.length) aviso = ["📅 " + d.vencimentos.slice(0, 2).map(v => `${ddmm(v.d)} ${v.desc} ${brl(v.v)}`).join(" · "), texto];
   else if (d.faturas && d.faturas.length) aviso = ["💳 " + d.faturas.map(f => `${f.cartao} ${brl(f.total)} (${ddmm(f.venc)})`).join(" · "), texto];
   if (aviso) txt(w, aviso[0], 11, { color: aviso[1] });
 
   w.addSpacer();
-  txt(w, `${d._offline ? "sem internet · " : ""}atualizado ${hora(d.atualizadoEm)}`, 8, { color: suave });
+  txt(w, rodape(d), 8, { color: suave });
+}
+
+// "atualizado" é a hora em que o widget buscou os dados; se o app não salva há mais de 3 h, avisa
+function rodape(d) {
+  const quando = d.consultadoEm || d.atualizadoEm;
+  const velho = d.atualizadoEm && Date.now() - new Date(d.atualizadoEm).getTime() > 3 * 3600 * 1000;
+  return `${d._offline ? "sem internet · " : ""}atualizado ${hora(quando)}${velho ? ` · app aberto em ${diaHora(d.atualizadoEm)}` : ""}`;
 }
 
 function erro(w, msg) {

@@ -2107,6 +2107,7 @@ function resumoIA() {
       lancamentosDeHoje: all.filter(i => i.d === td).map(i => ({ ...it(i), tipo: i.t })),
       fixosVencidosSemConfirmar: pendingPast().map(p => ({ d: p.d, desc: p.desc, v: p.v })),
       vencimentosProximos7Dias: vencimentos(7).map(p => ({ d: p.d, desc: p.desc, v: p.v })),
+      caixa: caixaInfo(),
       faturas: (c.cartoes || []).map(k => { const x = fatura(k, cy); return { cartao: k.nome, mes: cy, total: x.total, vencimento: x.venc, paga: !!x.paga }; }),
       metas: (c.metas || []).map(mt => { const k = metaCalc(mt); return { nome: mt.nome, tipo: META_TIPOS[mt.tipo], prazo: mt.prazo, alvo: k.alvo, atual: k.atual, falta: k.falta, guardarPorMes: k.porMes, status: k.st[1], ...(k.extra ? { obs: k.extra } : {}) }; }),
       reserva: { valor: R.reserva, custoDeVidaMensal: R.custo.total, mesesCobertos: R.meses == null ? null : Math.round(R.meses * 10) / 10, faltaPara6Meses: R.falta6 },
@@ -2118,6 +2119,28 @@ function resumoIA() {
       projecao: CALC.order.filter(ym => ym >= cy).slice(0, 13).map(ym => { const x = M(ym); return { mes: ym, entradas: r2(x.ent + x.pEnt), saidas: r2(x.sai + x.pSai), diario: r2(x.dia + x.pDia), livre: r2(x.ent + x.pEnt - x.sai - x.pSai - x.dia - x.pDia), saldoFim: x.saldoFim }; })
     };
   } catch (e) { return { erro: String(e && e.message || e) }; }
+}
+
+/* ───────── dinheiro em conta: quanto dá para tirar hoje sem a conta ficar negativa ─────────
+   Parte do saldo real de hoje e soma, dia a dia até o fim do mês seguinte, as entradas e saídas
+   lançadas ou previstas (fixos e faturas), sem contar o orçamento do diário dos próximos dias.
+   O menor ponto desse caminho é o que está livre para gastar hoje. */
+function caixaInfo() {
+  if (!CALC || antesDoInicio()) return null;
+  const td = today(), cy = curYm();
+  let cash = saldoHoje(), menor = null, menorEm = null, prox = null;
+  for (const ym of [cy, ymAdd(cy, 1)]) {
+    const m = M(ym); if (!m) continue;
+    for (const R of m.days) {
+      if (R.before || R.ds < td) continue;
+      // hoje: o real já inclui o que foi lançado; falta só o previsto ainda não confirmado
+      cash = R.ds === td ? r2(cash + R.pEnt - R.pSai) : r2(cash + R.ent + R.pEnt - R.sai - R.pSai - R.dia);
+      if (!prox && R.ds > td && R.ent + R.pEnt > 0) prox = { d: R.ds, v: r2(R.ent + R.pEnt) };
+      if (menor == null || cash < menor) { menor = cash; menorEm = R.ds; }
+    }
+  }
+  if (menor == null) return null;
+  return { emConta: saldoHoje(), menor, menorEm, livreHoje: Math.max(0, r2(menor)), proximaEntrada: prox };
 }
 
 /* ───────── custo de vida e reserva ───────── */

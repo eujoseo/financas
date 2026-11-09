@@ -60,7 +60,22 @@ function montarResumo_() {
   const diarioMes = (m ? +m.diario || 0 : 0) + soma_(novosDepois);
   const restanteAntesDeHoje = orc - (diarioMes - gastoHoje);
   const porDia = orc ? arred_(restanteAntesDeHoje / diasRestantes) : null;
-  const sobraHoje = porDia == null ? null : arred_(porDia - gastoHoje);
+  const sobraOrcamento = porDia == null ? null : arred_(porDia - gastoHoje);
+
+  // dinheiro em conta: o resumo é do momento em que o app salvou; desconta o que entrou depois
+  // (bot ou app), menos compras no cartão, que só saem da conta na fatura
+  const cartoes = ((dados.config || {}).cartoes || []).map(function (c) { return c.nome; });
+  const desde = r.geradoEm || '';
+  const mudouConta = [mesAtual, somaMes_(mesAtual, -1)].reduce(function (acc, ym) { return acc.concat(itensDoMes_(dados, ym)); }, [])
+    .filter(function (i) { return i.em && i.em > desde && cartoes.indexOf(i.pag) < 0; })
+    .reduce(function (s, i) { return s + (i.t === 'entrada' ? 1 : -1) * (+i.v || 0); }, 0);
+  const saldoConta = r.saldoEmContaHoje == null ? null : arred_(+r.saldoEmContaHoje + mudouConta);
+  const cx = r.caixa || null;
+  const livreConta = cx ? Math.max(0, arred_(+cx.menor + mudouConta)) : (saldoConta == null ? null : Math.max(0, saldoConta));
+
+  // pode gastar hoje = o que sobra do orçamento de hoje, limitado ao que a conta aguenta
+  let sobraHoje = sobraOrcamento, limitadoPelaConta = false;
+  if (sobraHoje != null && livreConta != null && sobraHoje > livreConta) { sobraHoje = livreConta; limitadoPelaConta = true; }
 
   const venc = (r.vencimentosProximos7Dias || [])
     .filter(function (v) { return v.d >= hoje; })
@@ -73,8 +88,11 @@ function montarResumo_() {
     .map(function (f) { return { cartao: f.cartao, total: +f.total, venc: f.vencimento }; });
 
   return {
-    ok: true, hoje: hoje, atualizadoEm: r.geradoEm, dadosDeHoje: r.hoje === hoje,
-    saldoConta: r.saldoEmContaHoje, gastoHoje: arred_(gastoHoje), porDia: porDia, sobraHoje: sobraHoje,
+    ok: true, hoje: hoje, atualizadoEm: r.geradoEm, consultadoEm: new Date().toISOString(), dadosDeHoje: r.hoje === hoje,
+    saldoConta: saldoConta, gastoHoje: arred_(gastoHoje), porDia: porDia, sobraHoje: sobraHoje,
+    sobraOrcamento: sobraOrcamento, livreConta: livreConta, limitadoPelaConta: limitadoPelaConta,
+    faltaNaConta: cx && +cx.menor + mudouConta < 0 ? { v: arred_(-(+cx.menor + mudouConta)), d: cx.menorEm } : null,
+    proximaEntrada: cx ? cx.proximaEntrada : null,
     diasRestantes: diasRestantes,
     mes: m ? {
       orcamentoDiario: orc, gastoDiario: arred_(diarioMes), usoPct: orc ? Math.round(diarioMes / orc * 100) : null,
@@ -245,6 +263,8 @@ function cmdHoje_() {
   r += '\nDiário de hoje: <b>' + brl_(dia) + '</b>';
   const w = tentar_(montarResumo_);
   if (w && w.sobraHoje != null) r += '\n' + (w.sobraHoje >= 0 ? 'Ainda pode gastar hoje: <b>' + brl_(w.sobraHoje) + '</b>' : 'Passou ' + brl_(-w.sobraHoje) + ' do previsto para hoje');
+  if (w && w.limitadoPelaConta) r += '\n<i>(limitado pelo dinheiro em conta' + (w.proximaEntrada ? ' até a entrada de ' + br_(w.proximaEntrada.d) : '') + ')</i>';
+  if (w && w.faltaNaConta) r += '\n⚠️ Faltam ' + brl_(w.faltaNaConta.v) + ' na conta em ' + br_(w.faltaNaConta.d) + ' para cobrir as contas previstas.';
   return r;
 }
 
@@ -253,6 +273,8 @@ function cmdSaldo_() {
   const w = montarResumo_();
   let s = '📊 <b>Como está o mês</b>\n';
   s += 'Saldo em conta: <b>' + brl_(w.saldoConta) + '</b>\n';
+  if (w.livreConta != null) s += 'Livre na conta (já separando contas previstas): <b>' + brl_(w.livreConta) + '</b>' + (w.proximaEntrada ? ' · próxima entrada ' + br_(w.proximaEntrada.d) : '') + '\n';
+  if (w.faltaNaConta) s += '⚠️ Faltam ' + brl_(w.faltaNaConta.v) + ' na conta em ' + br_(w.faltaNaConta.d) + '\n';
   if (w.mes) {
     s += 'Diário: ' + brl_(w.mes.gastoDiario) + ' de ' + brl_(w.mes.orcamentoDiario) + ' (' + w.mes.usoPct + '%)\n';
     s += 'Pode gastar por dia até o fim do mês: <b>' + brl_(w.porDia) + '</b>\n';
